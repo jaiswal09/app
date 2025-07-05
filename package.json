@@ -1,16 +1,45 @@
 {
-  "name": "medical-inventory-system",
-  "private": true,
-  "version": "1.0.0",
-  "type": "module",
+  "name": "medical-inventory-local",
+  "version": "2.0.0",
+  "description": "Local Medical Inventory Management System with Express.js backend and React frontend",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "setup": "npm run setup:backend && npm run setup:frontend",
+    "setup:backend": "cd backend && npm install && npm run db:generate && npm run db:push && npm run db:seed",
+    "setup:frontend": "npm install",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "vite",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "vite build",
+    "start": "npm run start:backend & npm run start:frontend",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "vite preview",
+    "db:studio": "cd backend && npm run db:studio",
+    "db:reset": "cd backend && npm run db:reset",
+    "clean": "rm -rf backend/node_modules node_modules backend/dist dist",
+    "test": "echo \"No tests specified\" && exit 0",
     "lint": "eslint .",
     "preview": "vite preview"
   },
+  "keywords": [
+    "medical",
+    "inventory",
+    "management",
+    "express",
+    "react",
+    "prisma",
+    "local",
+    "healthcare"
+  ],
+  "author": "Medical Inventory Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
     "@tanstack/react-query": "^5.18.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -25,7 +54,8 @@
     "zustand": "^4.4.7",
     "openai": "^4.28.0",
     "papaparse": "^5.4.1",
-    "file-saver": "^2.0.5"
+    "file-saver": "^2.0.5",
+    "axios": "^1.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
