@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase, createQuery, createSingleQuery } from '../lib/supabase';
+import { 
+  inventoryApi, 
+  categoriesApi, 
+  transactionsApi, 
+  maintenanceApi, 
+  alertsApi,
+  websocketApi 
+} from '../lib/api';
 import type { InventoryItem, Category, Transaction, MaintenanceSchedule, LowStockAlert } from '../types';
 import { toast } from 'react-hot-toast';
 
