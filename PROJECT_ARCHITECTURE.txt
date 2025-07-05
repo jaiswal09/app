@@ -1,0 +1,527 @@
+# Medical Inventory Management System - Project Architecture
+
+## Overview
+This document provides a comprehensive overview of the Medical Inventory Management System architecture, database design, and implementation details for developers looking to understand or recreate this system.
+
+## System Architecture
+
+### Frontend Architecture
+```
+src/
+├── components/           # React components organized by feature
+│   ├── Auth/            # Authentication components
+│   ├── Dashboard/       # Dashboard and overview components
+│   ├── Inventory/       # Inventory management components
+│   ├── Transactions/    # Transaction tracking components
+│   ├── Maintenance/     # Maintenance scheduling components
+│   ├── Alerts/          # Alert management components
+│   ├── Reports/         # Analytics and reporting components
+│   ├── Users/           # User management components
+│   ├── Settings/        # System settings components
+│   ├── Layout/          # Layout components (Header, Sidebar)
+│   ├── AI/              # AI-powered features
+│   └── Debug/           # Debug and monitoring tools
+├── hooks/               # Custom React hooks
+├── lib/                 # Utility libraries and configurations
+├── types/               # TypeScript type definitions
+└── main.tsx            # Application entry point
+```
+
+### Backend Architecture (Supabase)
+```
+Database (PostgreSQL)
+├── Authentication (Supabase Auth)
+├── Real-time Subscriptions
+├── Row Level Security (RLS)
+├── Database Functions
+├── Triggers and Automation
+└── Storage (for file uploads)
+```
+
+## Database Schema
+
+### Core Tables
+
+#### 1. user_profiles
+Extends Supabase auth.users with application-specific data
+```sql
+CREATE TABLE user_profiles (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text NOT NULL,
+  full_name text NOT NULL,
+  role text NOT NULL CHECK (role IN ('admin', 'staff', 'medical_personnel')),
+  department text,
+  phone_number text,
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(user_id)
+);
+```
+
+#### 2. categories
+Organizes inventory items into logical groups
+```sql
+CREATE TABLE categories (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name text NOT NULL UNIQUE,
+  description text,
+  color text DEFAULT '#2563eb',
+  icon text DEFAULT 'Package',
+  is_active boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id)
+);
+```
+
+#### 3. inventory_items
+Core inventory tracking with comprehensive metadata
+```sql
+CREATE TABLE inventory_items (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name text NOT NULL,
+  description text,
+  category_id uuid REFERENCES categories(id),
+  item_type text NOT NULL CHECK (item_type IN ('equipment', 'supplies', 'medications', 'consumables')),
+  quantity integer NOT NULL DEFAULT 0,
+  min_quantity integer NOT NULL DEFAULT 0,
+  max_quantity integer,
+  unit_price decimal(10,2),
+  location text NOT NULL,
+  qr_code text UNIQUE,
+  barcode text,
+  status text NOT NULL DEFAULT 'available' CHECK (status IN ('available', 'in_use', 'maintenance', 'lost', 'expired', 'discontinued')),
+  expiry_date date,
+  last_maintenance timestamptz,
+  next_maintenance timestamptz,
+  maintenance_interval_days integer,
+  image_url text,
+  notes text,
+  serial_number text,
+  manufacturer text,
+  model text,
+  purchase_date date,
+  warranty_expiry date,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id)
+);
+```
+
+#### 4. transactions
+Complete audit trail of all inventory movements
+```sql
+CREATE TABLE transactions (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  item_id uuid NOT NULL REFERENCES inventory_items(id),
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  transaction_type text NOT NULL CHECK (transaction_type IN ('checkout', 'checkin', 'lost', 'damaged', 'maintenance')),
+  quantity integer NOT NULL,
+  due_date date,
+  returned_date timestamptz,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'overdue', 'lost', 'damaged')),
+  notes text,
+  approved_by uuid REFERENCES auth.users(id),
+  approved_at timestamptz,
+  location_used text,
+  condition_on_return text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+```
+
+#### 5. maintenance_schedules
+Equipment maintenance tracking and scheduling
+```sql
+CREATE TABLE maintenance_schedules (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  item_id uuid NOT NULL REFERENCES inventory_items(id),
+  maintenance_type text NOT NULL CHECK (maintenance_type IN ('preventive', 'corrective', 'calibration', 'inspection')),
+  scheduled_date date NOT NULL,
+  completed_date date,
+  status text NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled', 'overdue')),
+  technician_id uuid REFERENCES auth.users(id),
+  description text,
+  cost decimal(10,2),
+  notes text,
+  next_maintenance_date date,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id)
+);
+```
+
+#### 6. low_stock_alerts
+Automated stock level monitoring
+```sql
+CREATE TABLE low_stock_alerts (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  item_id uuid NOT NULL REFERENCES inventory_items(id),
+  current_quantity integer NOT NULL,
+  min_quantity integer NOT NULL,
+  alert_level text NOT NULL CHECK (alert_level IN ('low', 'critical', 'out_of_stock')),
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'acknowledged', 'resolved')),
+  acknowledged_by uuid REFERENCES auth.users(id),
+  acknowledged_at timestamptz,
+  resolved_at timestamptz,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+#### 7. system_logs
+Audit and debug logging
+```sql
+CREATE TABLE system_logs (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id uuid REFERENCES auth.users(id),
+  action text NOT NULL,
+  table_name text,
+  record_id uuid,
+  old_values jsonb,
+  new_values jsonb,
+  ip_address inet,
+  user_agent text,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+### Database Functions
+
+#### 1. QR Code Generation
+```sql
+CREATE OR REPLACE FUNCTION generate_qr_code()
+RETURNS TRIGGER AS $$
+DECLARE
+  new_qr_code text;
+  counter integer := 0;
+BEGIN
+  IF NEW.qr_code IS NULL THEN
+    new_qr_code := 'QR-' || LPAD(nextval('qr_code_sequence')::text, 6, '0');
+    
+    WHILE EXISTS (SELECT 1 FROM inventory_items WHERE qr_code = new_qr_code) LOOP
+      counter := counter + 1;
+      new_qr_code := 'QR-' || LPAD(nextval('qr_code_sequence')::text, 6, '0');
+      
+      IF counter > 100 THEN
+        new_qr_code := 'QR-' || EXTRACT(EPOCH FROM NOW())::bigint || '-' || counter;
+        EXIT;
+      END IF;
+    END LOOP;
+    
+    NEW.qr_code := new_qr_code;
+  END IF;
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+```
+
+#### 2. Low Stock Alert Generation
+```sql
+CREATE OR REPLACE FUNCTION check_low_stock()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.quantity <= NEW.min_quantity THEN
+    DECLARE
+      alert_level_val text;
+    BEGIN
+      IF NEW.quantity = 0 THEN
+        alert_level_val := 'out_of_stock';
+      ELSIF NEW.quantity <= (NEW.min_quantity * 0.5) THEN
+        alert_level_val := 'critical';
+      ELSE
+        alert_level_val := 'low';
+      END IF;
+
+      INSERT INTO low_stock_alerts (item_id, current_quantity, min_quantity, alert_level, status)
+      VALUES (NEW.id, NEW.quantity, NEW.min_quantity, alert_level_val, 'active')
+      ON CONFLICT (item_id) WHERE status = 'active'
+      DO UPDATE SET 
+        current_quantity = NEW.quantity,
+        alert_level = alert_level_val,
+        created_at = CURRENT_TIMESTAMP;
+    END;
+  ELSE
+    UPDATE low_stock_alerts 
+    SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP
+    WHERE item_id = NEW.id AND status = 'active';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+```
+
+#### 3. Safe Inventory Quantity Updates
+```sql
+CREATE OR REPLACE FUNCTION update_inventory_quantity(
+  item_id uuid,
+  quantity_change integer
+)
+RETURNS void AS $$
+BEGIN
+  UPDATE inventory_items 
+  SET quantity = GREATEST(0, quantity + quantity_change),
+      updated_at = CURRENT_TIMESTAMP
+  WHERE id = item_id;
+END;
+$$ language 'plpgsql';
+```
+
+### Row Level Security (RLS) Policies
+
+#### User Profiles
+```sql
+-- Users can read their own profile
+CREATE POLICY "Users can read own profile" ON user_profiles
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Admin can read all profiles
+CREATE POLICY "Admin can read all profiles" ON user_profiles
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles 
+      WHERE user_id = auth.uid() AND role = 'admin'
+    )
+  );
+```
+
+#### Inventory Items
+```sql
+-- All authenticated users can read inventory
+CREATE POLICY "Authenticated users can read inventory" ON inventory_items
+  FOR SELECT TO authenticated USING (true);
+
+-- Admin and Staff can manage inventory
+CREATE POLICY "Admin and Staff can manage inventory" ON inventory_items
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles 
+      WHERE user_id = auth.uid() AND role IN ('admin', 'staff')
+    )
+  );
+```
+
+#### Transactions
+```sql
+-- Users can read own transactions
+CREATE POLICY "Users can read own transactions" ON transactions
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Admin and Staff can read all transactions
+CREATE POLICY "Admin and Staff can read all transactions" ON transactions
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM user_profiles 
+      WHERE user_id = auth.uid() AND role IN ('admin', 'staff')
+    )
+  );
+```
+
+## Frontend Implementation
+
+### State Management
+- **React Query** for server state management
+- **React Context** for global UI state
+- **Local State** for component-specific state
+
+### Data Fetching Pattern
+```typescript
+// Custom hook pattern
+export const useInventory = () => {
+  const queryClient = useQueryClient();
+
+  const inventoryQuery = useQuery({
+    queryKey: ['inventory'],
+    queryFn: () => createQuery(
+      supabase
+        .from('inventory_items')
+        .select('*, category:categories(*)')
+        .order('name')
+    ),
+    staleTime: 1 * 60 * 1000, // 1 minute
+  });
+
+  // Real-time subscription
+  useEffect(() => {
+    const subscription = supabase
+      .channel('inventory_changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'inventory_items' },
+        () => queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      )
+      .subscribe();
+
+    return () => subscription.unsubscribe();
+  }, [queryClient]);
+
+  return {
+    items: inventoryQuery.data?.data || [],
+    isLoading: inventoryQuery.isLoading,
+    error: inventoryQuery.error
+  };
+};
+```
+
+### Component Architecture
+- **Atomic Design** principles
+- **Compound Components** for complex UI
+- **Render Props** for reusable logic
+- **Custom Hooks** for business logic
+
+### Real-time Updates
+```typescript
+// Real-time subscription pattern
+useEffect(() => {
+  const subscription = supabase
+    .channel('table_changes')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'table_name' },
+      (payload) => {
+        // Handle real-time updates
+        queryClient.invalidateQueries({ queryKey: ['data'] });
+      }
+    )
+    .subscribe();
+
+  return () => subscription.unsubscribe();
+}, []);
+```
+
+## AI Integration
+
+### Google Gemini AI Features
+1. **Smart Notifications**: Generate intelligent alerts based on inventory patterns
+2. **Email Parsing**: Extract inventory data from email content
+3. **Excel Mapping**: Intelligent field mapping for data imports
+4. **Optimization Suggestions**: AI-powered inventory optimization
+
+### Implementation Pattern
+```typescript
+export const generateSmartNotifications = async (inventoryData, transactionData, alertData) => {
+  try {
+    const prompt = `
+    Based on the following medical inventory data, generate intelligent notifications:
+    Inventory: ${JSON.stringify(inventoryData.slice(0, 10))}
+    Transactions: ${JSON.stringify(transactionData.slice(0, 10))}
+    Alerts: ${JSON.stringify(alertData)}
+    
+    Return JSON format with notifications array...
+    `;
+
+    const result = await geminiModel.generateContent(prompt);
+    return JSON.parse(result.response.text());
+  } catch (error) {
+    console.error('AI error:', error);
+    return { notifications: [] };
+  }
+};
+```
+
+## Security Implementation
+
+### Authentication Flow
+1. **Supabase Auth** for user authentication
+2. **JWT tokens** for session management
+3. **Role-based access** through user profiles
+4. **Session timeout** for security
+
+### Data Protection
+1. **Row Level Security (RLS)** on all tables
+2. **API rate limiting** through Supabase
+3. **Input validation** on frontend and database
+4. **Audit logging** for all operations
+
+## Performance Optimization
+
+### Frontend Optimizations
+1. **Code splitting** with React.lazy
+2. **Memoization** with React.memo and useMemo
+3. **Virtual scrolling** for large lists
+4. **Image optimization** and lazy loading
+
+### Database Optimizations
+1. **Indexes** on frequently queried columns
+2. **Query optimization** with proper joins
+3. **Connection pooling** through Supabase
+4. **Caching** with React Query
+
+## Deployment Architecture
+
+### Frontend Deployment
+- **Netlify/Vercel** for static hosting
+- **Environment variables** for configuration
+- **Build optimization** for production
+- **CDN** for global distribution
+
+### Backend (Supabase)
+- **Managed PostgreSQL** database
+- **Real-time subscriptions** via WebSockets
+- **Edge functions** for serverless logic
+- **Global CDN** for API responses
+
+## Development Workflow
+
+### Local Development
+1. Clone repository
+2. Install dependencies
+3. Set up environment variables
+4. Run database migrations
+5. Start development server
+
+### Testing Strategy
+1. **Unit tests** for utility functions
+2. **Integration tests** for API calls
+3. **E2E tests** for critical user flows
+4. **Manual testing** for UI/UX
+
+### CI/CD Pipeline
+1. **Automated testing** on pull requests
+2. **Build verification** before deployment
+3. **Automatic deployment** on main branch
+4. **Database migration** handling
+
+## Monitoring and Debugging
+
+### Debug Features
+1. **Debug panel** with Ctrl+Shift+D
+2. **Connection status** monitoring
+3. **API request logging**
+4. **Real-time event tracking**
+
+### Error Handling
+1. **Global error boundaries**
+2. **Toast notifications** for user feedback
+3. **Retry mechanisms** for failed requests
+4. **Fallback UI** for error states
+
+## Scalability Considerations
+
+### Database Scaling
+1. **Read replicas** for query distribution
+2. **Partitioning** for large tables
+3. **Archiving** old data
+4. **Connection pooling**
+
+### Frontend Scaling
+1. **Code splitting** by routes
+2. **Lazy loading** of components
+3. **Service workers** for caching
+4. **Progressive Web App** features
+
+## Migration from Other Systems
+
+### Data Migration
+1. **Export existing data** to CSV/Excel
+2. **Use AI-powered mapping** for field matching
+3. **Batch import** with validation
+4. **Data verification** and cleanup
+
+### User Migration
+1. **Export user data** from existing system
+2. **Create user profiles** in new system
+3. **Role mapping** and permission setup
+4. **Training and onboarding**
+
+This architecture provides a solid foundation for building a scalable, secure, and feature-rich medical inventory management system. The modular design allows for easy extension and customization based on specific requirements.
