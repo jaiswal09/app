@@ -1,0 +1,297 @@
+# Medical Inventory Management System - Local Setup Guide
+
+This guide will help you set up the complete Medical Inventory Management System to run locally on your computer using your own resources instead of cloud services.
+
+## 🎯 What This Setup Provides
+
+✅ **Complete Local Solution**: No cloud dependencies or subscription costs
+✅ **Your Data, Your Control**: All data stays on your computer
+✅ **Full-Featured System**: All original features working locally
+✅ **Easy Setup**: One command installation
+✅ **Offline Capable**: Works without internet connection
+✅ **Real-time Updates**: WebSocket-based real-time features
+✅ **Sample Data**: Pre-loaded with realistic medical inventory data
+
+## 📋 Prerequisites
+
+Before starting, ensure you have:
+
+1. **Node.js 18+** installed on your computer
+   - Download from: https://nodejs.org/
+   - Verify installation: `node --version`
+
+2. **npm 9+** (comes with Node.js)
+   - Verify installation: `npm --version`
+
+3. **At least 2GB free disk space**
+
+4. **Available ports**: 3001 (backend) and 5173 (frontend)
+
+## 🚀 Quick Setup (Recommended)
+
+### Step 1: Install Dependencies and Setup Database
+Open your terminal/command prompt in the project directory and run:
+
+```bash
+npm run setup
+```
+
+This single command will:
+- Install all backend dependencies
+- Install all frontend dependencies
+- Generate Prisma database client
+- Create SQLite database
+- Run database migrations
+- Seed database with sample data
+
+### Step 2: Start the Application
+After setup completes, start both frontend and backend:
+
+```bash
+npm run dev
+```
+
+This will start:
+- Backend server on: http://localhost:3001
+- Frontend app on: http://localhost:5173
+
+### Step 3: Access the Application
+Open your web browser and go to: http://localhost:5173
+
+## 👥 Default Login Credentials
+
+The system comes with three pre-configured users:
+
+### Administrator Account
+- **Email**: admin@medical.com
+- **Password**: admin123
+- **Role**: Full system access, user management, settings
+
+### Staff Account
+- **Email**: staff@medical.com
+- **Password**: staff123
+- **Role**: Inventory management, transactions, reports
+
+### Medical Personnel Account
+- **Email**: medical@medical.com
+- **Password**: medical123
+- **Role**: Item checkout/checkin, view own transactions
+
+## 🛠️ Manual Setup (If Needed)
+
+If the quick setup doesn't work, follow these manual steps:
+
+### Backend Setup
+```bash
+cd backend
+npm install
+npm run db:generate
+npm run db:push
+npm run db:seed
+npm run dev
+```
+
+### Frontend Setup (in a new terminal)
+```bash
+npm install
+npm run dev
+```
+
+## 📊 Sample Data Included
+
+Your system comes pre-loaded with:
+- **5 Categories**: Medical Equipment, Surgical Supplies, Medications, etc.
+- **15+ Inventory Items**: X-Ray machines, surgical tools, medications
+- **15+ Transactions**: Various checkout/checkin records
+- **10+ Maintenance Schedules**: Equipment maintenance records
+- **Low Stock Alerts**: Automatic alerts for items running low
+
+## 🔧 Available Commands
+
+### Main Commands
+- `npm run setup` - Complete setup (recommended)
+- `npm run dev` - Start both frontend and backend
+- `npm run build` - Build for production
+- `npm run start` - Start production build
+
+### Backend Commands
+- `npm run dev:backend` - Start backend only
+- `npm run db:studio` - Open database viewer
+- `npm run db:reset` - Reset database (warning: deletes all data)
+
+### Frontend Commands
+- `npm run dev:frontend` - Start frontend only
+
+## 📁 Project Structure
+
+```
+/
+├── backend/                 # Express.js + Prisma backend
+│   ├── src/
+│   │   ├── routes/         # API endpoints
+│   │   ├── middleware/     # Authentication, validation
+│   │   ├── utils/          # Helper functions
+│   │   └── server.ts       # Main server file
+│   ├── prisma/
+│   │   └── schema.prisma   # Database schema
+│   └── package.json
+├── src/                    # React frontend
+│   ├── components/         # UI components
+│   ├── hooks/             # React hooks
+│   ├── lib/               # API client, utilities
+│   └── types/             # TypeScript definitions
+├── package.json           # Main package file
+└── setup.txt             # This file
+```
+
+## 🔌 Technical Details
+
+### Database
+- **Type**: SQLite (file-based, no server needed)
+- **Location**: `backend/prisma/dev.db`
+- **ORM**: Prisma for type-safe database access
+
+### Backend
+- **Framework**: Express.js with TypeScript
+- **Port**: 3001
+- **Authentication**: JWT tokens
+- **Real-time**: WebSocket connections
+
+### Frontend
+- **Framework**: React 18 with TypeScript
+- **Port**: 5173
+- **Styling**: Tailwind CSS
+- **State**: React Query + Zustand
+
+## 🔐 Security Features
+
+- **JWT Authentication**: Secure token-based auth
+- **Role-Based Access**: Admin, Staff, Medical Personnel roles
+- **Input Validation**: All inputs validated and sanitized
+- **Session Management**: 8-hour sessions with activity tracking
+
+## 📱 Features Available
+
+### Inventory Management
+- ✅ Add, edit, delete inventory items
+- ✅ Automatic QR code generation
+- ✅ Category management
+- ✅ Stock level monitoring
+- ✅ Real-time updates
+
+### Transaction System
+- ✅ Checkout/checkin workflow
+- ✅ Due date tracking
+- ✅ Return condition assessment
+- ✅ Transaction history
+
+### Maintenance Management
+- ✅ Schedule preventive maintenance
+- ✅ Track maintenance costs
+- ✅ Technician assignment
+- ✅ Maintenance history
+
+### Alerts & Notifications
+- ✅ Low stock alerts
+- ✅ Critical item notifications
+- ✅ Real-time alert system
+
+### Reports & Analytics
+- ✅ Dashboard with key metrics
+- ✅ Usage statistics
+- ✅ Category distribution
+- ✅ Export capabilities
+
+### User Management (Admin)
+- ✅ Create and manage users
+- ✅ Role assignment
+- ✅ User activity tracking
+
+## 🚨 Troubleshooting
+
+### Port Already in Use
+If you get "port already in use" errors:
+```bash
+# Kill processes on ports 3001 and 5173
+npx kill-port 3001 5173
+```
+
+### Database Issues
+If you encounter database problems:
+```bash
+cd backend
+npm run db:reset
+npm run db:seed
+```
+
+### Permission Issues (Linux/Mac)
+If you get permission errors:
+```bash
+sudo chown -R $USER:$USER .
+```
+
+### Module Not Found Errors
+If you get module errors:
+```bash
+rm -rf node_modules backend/node_modules
+npm run setup
+```
+
+## 📈 Performance Tips
+
+### For Better Performance
+1. **Close unnecessary applications** while running the system
+2. **Use Chrome or Firefox** for best experience
+3. **Keep at least 1GB RAM free** for smooth operation
+
+### Database Optimization
+- The SQLite database file grows over time
+- Regularly export important data
+- Consider periodic database cleanup for better performance
+
+## 🔄 Backup & Restore
+
+### Backup Your Data
+```bash
+# Backup database file
+cp backend/prisma/dev.db backup/medical-inventory-backup-$(date +%Y%m%d).db
+```
+
+### Restore Data
+```bash
+# Restore from backup
+cp backup/medical-inventory-backup-YYYYMMDD.db backend/prisma/dev.db
+```
+
+## 🆘 Need Help?
+
+### Common Issues
+1. **System won't start**: Check if ports 3001 and 5173 are free
+2. **Can't login**: Use the default credentials provided above
+3. **Real-time updates not working**: Refresh the page and check WebSocket connection
+4. **Database errors**: Run `npm run db:reset` to reset database
+
+### Getting Support
+- Check the browser console for error messages
+- Verify all prerequisites are installed
+- Ensure you have sufficient disk space
+- Try the troubleshooting steps above
+
+## 🎉 Success!
+
+If everything is working correctly, you should see:
+- ✅ Backend server running on http://localhost:3001
+- ✅ Frontend app accessible at http://localhost:5173
+- ✅ Ability to login with provided credentials
+- ✅ Sample data visible in the dashboard
+- ✅ Real-time updates when making changes
+
+**Congratulations!** You now have a fully functional, local Medical Inventory Management System running on your computer with no cloud dependencies or subscription costs.
+
+## 📝 License
+
+This project is open source and available under the MIT License.
+
+---
+
+**Enjoy your local Medical Inventory Management System!** 🏥💻
