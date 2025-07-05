@@ -190,7 +190,7 @@ export interface DashboardStats {
 
 export interface ConnectionStatus {
   online: boolean;
-  supabaseConnected: boolean;
+  backendConnected: boolean;
   realtimeConnected: boolean;
   lastPing?: number;
   latency?: number;
@@ -216,8 +216,7 @@ export interface DebugInfo {
     payload?: any;
   }>;
   environment: {
-    supabaseUrl?: string;
-    projectId?: string;
+    backendUrl?: string;
     userId?: string;
     userRole?: string;
   };
