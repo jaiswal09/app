@@ -1,0 +1,250 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  profile UserProfile?
+  
+  @@map("users")
+}
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  email       String
+  fullName    String   @map("full_name")
+  role        String   // admin, staff, medical_personnel
+  department  String?
+  phoneNumber String?  @map("phone_number")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Relations
+  createdItems      InventoryItem[]      @relation("CreatedByUser")
+  createdCategories Category[]           @relation("CreatedByUser")
+  transactions      Transaction[]        @relation("UserTransactions")
+  approvedTransactions Transaction[]     @relation("ApprovedByUser")
+  maintenanceSchedules MaintenanceSchedule[] @relation("TechnicianUser")
+  createdMaintenanceSchedules MaintenanceSchedule[] @relation("CreatedByUser")
+  acknowledgedAlerts LowStockAlert[]     @relation("AcknowledgedByUser")
+  systemLogs         SystemLog[]         @relation("UserLogs")
+  createdBills       Bill[]              @relation("CreatedByUser")
+  createdPayments    BillPayment[]       @relation("CreatedByUser")
+  
+  @@map("user_profiles")
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String   @default("#2563eb")
+  icon        String   @default("Package")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdBy   String?  @map("created_by")
+  
+  creator UserProfile? @relation("CreatedByUser", fields: [createdBy], references: [id])
+  items   InventoryItem[]
+  
+  @@map("categories")
+}
+
+model InventoryItem {
+  id                      String   @id @default(cuid())
+  name                    String
+  description             String?
+  categoryId              String?  @map("category_id")
+  itemType                String   @map("item_type") // equipment, supplies, medications, consumables
+  quantity                Int      @default(0)
+  minQuantity             Int      @default(0) @map("min_quantity")
+  maxQuantity             Int?     @map("max_quantity")
+  unitPrice               Float?   @map("unit_price")
+  location                String
+  qrCode                  String?  @unique @map("qr_code")
+  barcode                 String?
+  status                  String   @default("available") // available, in_use, maintenance, lost, expired, discontinued
+  expiryDate              DateTime? @map("expiry_date")
+  lastMaintenance         DateTime? @map("last_maintenance")
+  nextMaintenance         DateTime? @map("next_maintenance")
+  maintenanceIntervalDays Int?     @map("maintenance_interval_days")
+  imageUrl                String?  @map("image_url")
+  notes                   String?
+  serialNumber            String?  @map("serial_number")
+  manufacturer            String?
+  model                   String?
+  purchaseDate            DateTime? @map("purchase_date")
+  warrantyExpiry          DateTime? @map("warranty_expiry")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  createdBy               String?  @map("created_by")
+  
+  category            Category?             @relation(fields: [categoryId], references: [id])
+  creator             UserProfile?         @relation("CreatedByUser", fields: [createdBy], references: [id])
+  transactions        Transaction[]
+  maintenanceSchedules MaintenanceSchedule[]
+  lowStockAlerts      LowStockAlert[]
+  
+  @@map("inventory_items")
+}
+
+model Transaction {
+  id                 String   @id @default(cuid())
+  itemId             String   @map("item_id")
+  userId             String   @map("user_id")
+  transactionType    String   @map("transaction_type") // checkout, checkin, lost, damaged, maintenance
+  quantity           Int
+  dueDate            DateTime? @map("due_date")
+  returnedDate       DateTime? @map("returned_date")
+  status             String   @default("active") // active, completed, overdue, lost, damaged
+  notes              String?
+  approvedBy         String?  @map("approved_by")
+  approvedAt         DateTime? @map("approved_at")
+  locationUsed       String?  @map("location_used")
+  conditionOnReturn  String?  @map("condition_on_return")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  
+  item     InventoryItem @relation(fields: [itemId], references: [id])
+  user     UserProfile   @relation("UserTransactions", fields: [userId], references: [id])
+  approver UserProfile?  @relation("ApprovedByUser", fields: [approvedBy], references: [id])
+  
+  @@map("transactions")
+}
+
+model MaintenanceSchedule {
+  id                  String   @id @default(cuid())
+  itemId              String   @map("item_id")
+  maintenanceType     String   @map("maintenance_type") // preventive, corrective, calibration, inspection
+  scheduledDate       DateTime @map("scheduled_date")
+  completedDate       DateTime? @map("completed_date")
+  status              String   @default("scheduled") // scheduled, in_progress, completed, cancelled, overdue
+  technicianId        String?  @map("technician_id")
+  description         String?
+  cost                Float?
+  notes               String?
+  nextMaintenanceDate DateTime? @map("next_maintenance_date")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdBy           String?  @map("created_by")
+  
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+  technician UserProfile?  @relation("TechnicianUser", fields: [technicianId], references: [id])
+  creator    UserProfile?  @relation("CreatedByUser", fields: [createdBy], references: [id])
+  
+  @@map("maintenance_schedules")
+}
+
+model LowStockAlert {
+  id               String   @id @default(cuid())
+  itemId           String   @map("item_id")
+  currentQuantity  Int      @map("current_quantity")
+  minQuantity      Int      @map("min_quantity")
+  alertLevel       String   @map("alert_level") // low, critical, out_of_stock
+  status           String   @default("active") // active, acknowledged, resolved
+  acknowledgedBy   String?  @map("acknowledged_by")
+  acknowledgedAt   DateTime? @map("acknowledged_at")
+  resolvedAt       DateTime? @map("resolved_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  
+  item         InventoryItem @relation(fields: [itemId], references: [id])
+  acknowledger UserProfile?  @relation("AcknowledgedByUser", fields: [acknowledgedBy], references: [id])
+  
+  @@map("low_stock_alerts")
+}
+
+model Bill {
+  id             String   @id @default(cuid())
+  billNumber     String   @unique @map("bill_number")
+  customerName   String   @map("customer_name")
+  customerEmail  String?  @map("customer_email")
+  customerPhone  String?  @map("customer_phone")
+  customerAddress String? @map("customer_address")
+  billDate       DateTime @map("bill_date")
+  dueDate        DateTime? @map("due_date")
+  subtotal       Float
+  taxRate        Float    @map("tax_rate")
+  taxAmount      Float    @map("tax_amount")
+  discountAmount Float    @map("discount_amount")
+  totalAmount    Float    @map("total_amount")
+  status         String   @default("draft") // draft, sent, paid, overdue, cancelled
+  paymentStatus  String   @default("pending") @map("payment_status") // pending, partial, paid, refunded
+  notes          String?
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  
+  creator  UserProfile? @relation("CreatedByUser", fields: [createdBy], references: [id])
+  items    BillItem[]
+  payments BillPayment[]
+  
+  @@map("bills")
+}
+
+model BillItem {
+  id              String   @id @default(cuid())
+  billId          String   @map("bill_id")
+  itemId          String?  @map("item_id")
+  itemName        String   @map("item_name")
+  itemDescription String?  @map("item_description")
+  quantity        Int
+  unitPrice       Float    @map("unit_price")
+  totalPrice      Float    @map("total_price")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+  
+  @@map("bill_items")
+}
+
+model BillPayment {
+  id              String   @id @default(cuid())
+  billId          String   @map("bill_id")
+  paymentDate     DateTime @map("payment_date")
+  amount          Float
+  paymentMethod   String   @map("payment_method") // cash, card, bank_transfer, check, other
+  referenceNumber String?  @map("reference_number")
+  notes           String?
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  bill    Bill         @relation(fields: [billId], references: [id], onDelete: Cascade)
+  creator UserProfile? @relation("CreatedByUser", fields: [createdBy], references: [id])
+  
+  @@map("bill_payments")
+}
+
+model SystemLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id")
+  action     String
+  tableName  String?  @map("table_name")
+  recordId   String?  @map("record_id")
+  oldValues  String?  @map("old_values") // JSON string
+  newValues  String?  @map("new_values") // JSON string
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  
+  user UserProfile? @relation("UserLogs", fields: [userId], references: [id])
+  
+  @@map("system_logs")
+}
