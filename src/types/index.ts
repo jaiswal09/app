@@ -1,14 +1,14 @@
 export interface UserProfile {
   id: string;
-  user_id: string;
+  userId: string; // FIX: Changed user_id to userId
   email: string;
-  full_name: string;
+  fullName: string; // FIX: Changed full_name to fullName
   role: 'admin' | 'staff' | 'medical_personnel';
   department?: string;
-  phone_number?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  phoneNumber?: string; // FIX: Changed phone_number to phoneNumber
+  isActive: boolean; // FIX: Changed is_active to isActive
+  createdAt: string; // FIX: Changed created_at to createdAt
+  updatedAt: string; // FIX: Changed updated_at to updatedAt
 }
 
 export interface Category {
@@ -17,155 +17,157 @@ export interface Category {
   description?: string;
   color: string;
   icon: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
+  isActive: boolean; // FIX: Changed is_active to isActive
+  createdAt: string; // FIX: Changed created_at to createdAt
+  updatedAt: string; // FIX: Changed updated_at to updatedAt
+  createdBy?: string; // FIX: Changed created_by to createdBy
 }
 
 export interface InventoryItem {
   id: string;
   name: string;
   description?: string;
-  category_id?: string;
+  categoryId?: string; // FIX: Changed category_id to categoryId
   category?: Category;
-  item_type: 'equipment' | 'supplies' | 'medications' | 'consumables';
+  itemType: 'equipment' | 'supplies' | 'medications' | 'consumables'; // FIX: Changed item_type to itemType
   quantity: number;
-  min_quantity: number;
-  max_quantity?: number;
-  unit_price?: number;
+  minQuantity: number; // FIX: Changed min_quantity to minQuantity
+  maxQuantity?: number; // FIX: Changed max_quantity to maxQuantity
+  unitPrice?: number; // FIX: Changed unit_price to unitPrice
   location: string;
-  qr_code?: string;
+  qrCode?: string; // FIX: Changed qr_code to qrCode
   barcode?: string;
   status: 'available' | 'in_use' | 'maintenance' | 'lost' | 'expired' | 'discontinued';
-  expiry_date?: string;
-  last_maintenance?: string;
-  next_maintenance?: string;
-  maintenance_interval_days?: number;
-  image_url?: string;
+  expiryDate?: string; // FIX: Changed expiry_date to expiryDate
+  lastMaintenance?: string; // FIX: Changed last_maintenance to lastMaintenance
+  nextMaintenance?: string; // FIX: Changed next_maintenance to nextMaintenance
+  maintenanceIntervalDays?: number; // FIX: Changed maintenance_interval_days to maintenanceIntervalDays
+  imageUrl?: string; // FIX: Changed image_url to imageUrl
   notes?: string;
-  serial_number?: string;
+  serialNumber?: string; // FIX: Changed serial_number to serialNumber
   manufacturer?: string;
   model?: string;
-  purchase_date?: string;
-  warranty_expiry?: string;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
+  purchaseDate?: string; // FIX: Changed purchase_date to purchaseDate
+  warrantyExpiry?: string; // FIX: Changed warranty_expiry to warrantyExpiry
+  createdAt: string; // FIX: Changed created_at to createdAt
+  updatedAt: string; // FIX: Changed updated_at to updatedAt
+  createdBy?: string; // FIX: Changed created_by to createdBy
 }
 
 export interface Transaction {
   id: string;
-  item_id: string;
+  itemId: string; // FIX: Changed item_id to itemId
   item?: InventoryItem;
-  user_id: string;
+  userId: string; // FIX: Changed user_id to userId
   user?: UserProfile;
-  transaction_type: 'checkout' | 'checkin' | 'lost' | 'damaged' | 'maintenance';
+  transactionType: 'checkout' | 'checkin' | 'lost' | 'damaged' | 'maintenance'; // FIX: Changed transaction_type to transactionType
   quantity: number;
-  due_date?: string;
-  returned_date?: string;
+  dueDate?: string; // FIX: Changed due_date to dueDate
+  returnedDate?: string; // FIX: Changed returned_date to returnedDate
   status: 'active' | 'completed' | 'overdue' | 'lost' | 'damaged';
   notes?: string;
-  approved_by?: string;
-  approved_at?: string;
-  location_used?: string;
-  condition_on_return?: string;
-  created_at: string;
-  updated_at: string;
+  approvedBy?: string; // FIX: Changed approved_by to approvedBy
+  approvedAt?: string; // FIX: Changed approved_at to approvedAt
+  locationUsed?: string; // FIX: Changed location_used to locationUsed
+  conditionOnReturn?: string; // FIX: Changed condition_on_return to conditionOnReturn
+  createdAt: string; // FIX: Changed created_at to createdAt
+  updatedAt: string; // FIX: Changed updated_at to updatedAt
 }
 
 export interface MaintenanceSchedule {
   id: string;
-  item_id: string;
+  itemId: string; // FIX: Changed item_id to itemId
   item?: InventoryItem;
-  maintenance_type: 'preventive' | 'corrective' | 'calibration' | 'inspection';
-  scheduled_date: string;
-  completed_date?: string;
+  maintenanceType: 'preventive' | 'corrective' | 'calibration' | 'inspection'; // FIX: Changed maintenance_type to maintenanceType
+  scheduledDate: string; // FIX: Changed scheduled_date to scheduledDate
+  completedDate?: string; // FIX: Changed completed_date to completedDate
   status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'overdue';
-  technician_id?: string;
+  technicianId?: string; // FIX: Changed technician_id to technicianId
   technician?: UserProfile;
   description?: string;
   cost?: number;
   notes?: string;
-  next_maintenance_date?: string;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
+  nextMaintenanceDate?: string; // FIX: Changed next_maintenance_date to nextMaintenanceDate
+  createdAt: string; // FIX: Changed created_at to createdAt
+  updatedAt: string; // FIX: Changed updated_at to updatedAt
+  createdBy?: string; // FIX: Changed created_by to createdBy
 }
 
 export interface LowStockAlert {
   id: string;
-  item_id: string;
+  itemId: string; // FIX: Changed item_id to itemId
   item?: InventoryItem;
-  current_quantity: number;
-  min_quantity: number;
-  alert_level: 'low' | 'critical' | 'out_of_stock';
+  currentQuantity: number; // FIX: Changed current_quantity to currentQuantity
+  minQuantity: number; // FIX: Changed min_quantity to minQuantity
+  alertLevel: 'low' | 'critical' | 'out_of_stock'; // FIX: Changed alert_level to alertLevel
   status: 'active' | 'acknowledged' | 'resolved';
-  acknowledged_by?: string;
-  acknowledged_at?: string;
-  resolved_at?: string;
-  created_at: string;
+  acknowledgedBy?: string; // FIX: Changed acknowledged_by to acknowledgedBy
+  acknowledgedAt?: string; // FIX: Changed acknowledged_at to acknowledgedAt
+  resolvedAt?: string; // FIX: Changed resolved_at to resolvedAt
+  createdAt: string; // FIX: Changed created_at to createdAt
 }
 
 export interface Bill {
   id: string;
-  bill_number: string;
-  customer_name: string;
-  customer_email?: string;
-  customer_phone?: string;
-  customer_address?: string;
-  bill_date: string;
-  due_date?: string;
+  billNumber: string; // FIX: Changed bill_number to billNumber
+  customerName: string; // FIX: Changed customer_name to customerName
+  customerEmail?: string; // FIX: Changed customer_email to customerEmail
+  customerPhone?: string; // FIX: Changed customer_phone to customerPhone
+  customerAddress?: string; // FIX: Changed customer_address to customerAddress
+  billDate: string; // FIX: Changed bill_date to billDate
+  dueDate?: string; // FIX: Changed due_date to dueDate
   subtotal: number;
-  tax_rate: number;
-  tax_amount: number;
-  discount_amount: number;
-  total_amount: number;
+  taxRate: number; // FIX: Changed tax_rate to taxRate
+  taxAmount: number; // FIX: Changed tax_amount to taxAmount
+  discountAmount: number; // FIX: Changed discount_amount to discountAmount
+  totalAmount: number; // FIX: Changed total_amount to totalAmount
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
-  payment_status: 'pending' | 'partial' | 'paid' | 'refunded';
+  paymentStatus: 'pending' | 'partial' | 'paid' | 'refunded'; // FIX: Changed payment_status to paymentStatus
   notes?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
+  createdBy?: string; // FIX: Changed created_by to createdBy
+  createdAt: string; // FIX: Changed created_at to createdAt
+  updatedAt: string; // FIX: Changed updated_at to updatedAt
   items?: BillItem[];
   payments?: BillPayment[];
+  creator?: UserProfile; // Added creator relationship
 }
 
 export interface BillItem {
   id: string;
-  bill_id: string;
-  item_id?: string;
-  item_name: string;
-  item_description?: string;
+  billId: string; // FIX: Changed bill_id to billId
+  itemId?: string; // FIX: Changed item_id to itemId
+  itemName: string; // FIX: Changed item_name to itemName
+  itemDescription?: string; // FIX: Changed item_description to itemDescription
   quantity: number;
-  unit_price: number;
-  total_price: number;
-  created_at?: string;
+  unitPrice: number; // FIX: Changed unit_price to unitPrice
+  totalPrice: number; // FIX: Changed total_price to totalPrice
+  createdAt?: string; // FIX: Changed created_at to createdAt
 }
 
 export interface BillPayment {
   id: string;
-  bill_id: string;
-  payment_date: string;
+  billId: string; // FIX: Changed bill_id to billId
+  paymentDate: string; // FIX: Changed payment_date to paymentDate
   amount: number;
-  payment_method: 'cash' | 'card' | 'bank_transfer' | 'check' | 'other';
-  reference_number?: string;
+  paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'check' | 'other'; // FIX: Changed payment_method to paymentMethod
+  referenceNumber?: string; // FIX: Changed reference_number to referenceNumber
   notes?: string;
-  created_by?: string;
-  created_at: string;
+  createdBy?: string; // FIX: Changed created_by to createdBy
+  createdAt: string; // FIX: Changed created_at to createdAt
+  creator?: UserProfile; // Added creator relationship
 }
 
 export interface SystemLog {
   id: string;
-  user_id?: string;
+  userId?: string; // FIX: Changed user_id to userId
   action: string;
-  table_name?: string;
-  record_id?: string;
-  old_values?: Record<string, any>;
-  new_values?: Record<string, any>;
-  ip_address?: string;
-  user_agent?: string;
-  created_at: string;
+  tableName?: string; // FIX: Changed table_name to tableName
+  recordId?: string; // FIX: Changed record_id to recordId
+  oldValues?: Record<string, any>;
+  newValues?: Record<string, any>;
+  ipAddress?: string; // FIX: Changed ip_address to ipAddress
+  userAgent?: string; // FIX: Changed user_agent to userAgent
+  createdAt: string; // FIX: Changed created_at to createdAt
 }
 
 export interface DashboardStats {
