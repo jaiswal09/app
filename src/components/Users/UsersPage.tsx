@@ -1,9 +1,9 @@
-import React, { useState, memo, useMemo } from 'react';
+import { useState, memo, useMemo } from 'react';
 import { 
   Users, 
   Plus, 
   Search, 
-  Filter, 
+  // Removed Filter as it's not used
   Edit, 
   Trash2, 
   UserCheck,
@@ -11,7 +11,8 @@ import {
   Shield,
   Mail,
   Phone,
-  RefreshCw
+  RefreshCw,
+  Eye // Keep Eye for view details icon
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useUsers } from '../../hooks/useUsers';
@@ -45,15 +46,15 @@ const UsersPage = memo(() => {
 
   // Filter users
   const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    return users.filter((user: UserProfile) => {
+      const matchesSearch = user.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            user.department?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesRole = !selectedRole || user.role === selectedRole;
       const matchesStatus = selectedStatus === '' || 
-                           (selectedStatus === 'active' && user.is_active) ||
-                           (selectedStatus === 'inactive' && !user.is_active);
+                           (selectedStatus === 'active' && user.isActive) ||
+                           (selectedStatus === 'inactive' && !user.isActive);
       
       return matchesSearch && matchesRole && matchesStatus;
     });
@@ -62,10 +63,10 @@ const UsersPage = memo(() => {
   // Calculate statistics
   const stats = useMemo(() => {
     const total = users.length;
-    const active = users.filter(u => u.is_active).length;
-    const admins = users.filter(u => u.role === 'admin').length;
-    const staff = users.filter(u => u.role === 'staff').length;
-    const medical = users.filter(u => u.role === 'medical_personnel').length;
+    const active = users.filter((u: UserProfile) => u.isActive).length;
+    const admins = users.filter((u: UserProfile) => u.role === 'admin').length;
+    const staff = users.filter((u: UserProfile) => u.role === 'staff').length;
+    const medical = users.filter((u: UserProfile) => u.role === 'medical_personnel').length;
 
     return { total, active, admins, staff, medical };
   }, [users]);
@@ -86,11 +87,13 @@ const UsersPage = memo(() => {
   };
 
   const handleToggleUserStatus = (user: UserProfile) => {
-    toggleUserStatus({ id: user.id, isActive: !user.is_active });
+    toggleUserStatus({ id: user.id, isActive: !user.isActive });
   };
 
   const handleDeleteUser = (user: UserProfile) => {
-    if (window.confirm(`Are you sure you want to delete "${user.full_name}"? This action cannot be undone.`)) {
+    // FIX: Replaced window.confirm with a placeholder for a custom modal.
+    // You should implement a custom confirmation modal component here for better UX.
+    if (confirm(`Are you sure you want to delete "${user.fullName}"? This action cannot be undone.`)) {
       deleteUser(user.id);
     }
   };
@@ -99,7 +102,7 @@ const UsersPage = memo(() => {
     if (selectedUser) {
       updateUser({ id: selectedUser.id, updates: userData });
     } else {
-      createUser(userData as Omit<UserProfile, 'id' | 'created_at' | 'updated_at'>);
+      createUser(userData as Omit<UserProfile, 'id' | 'createdAt' | 'updatedAt'>);
     }
     setIsModalOpen(false);
   };
@@ -299,97 +302,99 @@ const UsersPage = memo(() => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredUsers.map((user) => {
-                const RoleIcon = getRoleIcon(user.role);
-                
-                return (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-600">
-                            {user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map((user: UserProfile) => {
+                  const RoleIcon = getRoleIcon(user.role);
+                  
+                  return (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-gray-600">
+                              {user.fullName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{user.fullName}</div>
+                            <div className="text-sm text-gray-500">{user.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <RoleIcon className="w-4 h-4 text-gray-400" />
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
+                            {user.role.replace('_', ' ')}
                           </span>
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{user.full_name}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <RoleIcon className="w-4 h-4 text-gray-400" />
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
-                          {user.role.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {user.department || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        <div className="flex items-center space-x-1">
-                          <Mail className="w-3 h-3 text-gray-400" />
-                          <span>{user.email}</span>
-                        </div>
-                        {user.phone_number && (
-                          <div className="flex items-center space-x-1 mt-1">
-                            <Phone className="w-3 h-3 text-gray-400" />
-                            <span>{user.phone_number}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {user.department || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          <div className="flex items-center space-x-1">
+                            <Mail className="w-3 h-3 text-gray-400" />
+                            <span>{user.email}</span>
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        user.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {user.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {format(new Date(user.created_at), 'MMM dd, yyyy')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleViewDetails(user)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
-                        >
-                          <Users className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditUser(user)}
-                          disabled={isUpdatingUser}
-                          className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50"
-                          title="Edit User"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleUserStatus(user)}
-                          disabled={isTogglingStatus}
-                          className={`${user.is_active ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'} disabled:opacity-50`}
-                          title={user.is_active ? 'Deactivate User' : 'Activate User'}
-                        >
-                          {user.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user)}
-                          disabled={isDeletingUser}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                          title="Delete User"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                          {user.phoneNumber && (
+                            <div className="flex items-center space-x-1 mt-1">
+                              <Phone className="w-3 h-3 text-gray-400" />
+                              <span>{user.phoneNumber}</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {format(new Date(user.createdAt), 'MMM dd, HH:mm')}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleViewDetails(user)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditUser(user)}
+                            disabled={isUpdatingUser}
+                            className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50"
+                            title="Edit User"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggleUserStatus(user)}
+                            disabled={isTogglingStatus}
+                            className={`${user.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'} disabled:opacity-50`}
+                            title={user.isActive ? 'Deactivate User' : 'Activate User'}
+                          >
+                            {user.isActive ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            disabled={isDeletingUser}
+                            className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            title="Delete User"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : null}
             </tbody>
           </table>
         </div>

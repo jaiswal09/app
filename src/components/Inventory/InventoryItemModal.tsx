@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import { useState, memo } from 'react'; // Removed React as it's not directly used
 import { X, Save, Loader2 } from 'lucide-react';
 import { useInventory } from '../../hooks/useInventory';
 import type { InventoryItem, Category } from '../../types';
@@ -17,43 +17,45 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
   const [formData, setFormData] = useState({
     name: item?.name || '',
     description: item?.description || '',
-    category_id: item?.category_id || '',
-    item_type: item?.item_type || 'supplies' as const,
+    categoryId: item?.categoryId || '', // FIX: Changed category_id to categoryId
+    itemType: item?.itemType || 'supplies' as const, // FIX: Changed item_type to itemType
     quantity: item?.quantity || 0,
-    min_quantity: item?.min_quantity || 0,
-    max_quantity: item?.max_quantity || 0,
-    unit_price: item?.unit_price || 0,
+    minQuantity: item?.minQuantity || 0, // FIX: Changed min_quantity to minQuantity
+    maxQuantity: item?.maxQuantity || 0, // FIX: Changed max_quantity to maxQuantity
+    unitPrice: item?.unitPrice || 0, // FIX: Changed unit_price to unitPrice
     location: item?.location || '',
     status: item?.status || 'available' as const,
-    expiry_date: item?.expiry_date || '',
-    serial_number: item?.serial_number || '',
+    expiryDate: item?.expiryDate || '', // FIX: Changed expiry_date to expiryDate
+    serialNumber: item?.serialNumber || '', // FIX: Changed serial_number to serialNumber
     manufacturer: item?.manufacturer || '',
     model: item?.model || '',
-    purchase_date: item?.purchase_date || '',
-    warranty_expiry: item?.warranty_expiry || '',
-    maintenance_interval_days: item?.maintenance_interval_days || 0,
+    purchaseDate: item?.purchaseDate || '', // FIX: Changed purchase_date to purchaseDate
+    warrantyExpiry: item?.warrantyExpiry || '', // FIX: Changed warranty_expiry to warrantyExpiry
+    maintenanceIntervalDays: item?.maintenanceIntervalDays || 0, // FIX: Changed maintenance_interval_days to maintenanceIntervalDays
     notes: item?.notes || ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // FIX: Convert all snake_case properties to camelCase for the API payload
     const data = {
       ...formData,
       quantity: Number(formData.quantity),
-      min_quantity: Number(formData.min_quantity),
-      max_quantity: formData.max_quantity ? Number(formData.max_quantity) : null,
-      unit_price: formData.unit_price ? Number(formData.unit_price) : null,
-      maintenance_interval_days: formData.maintenance_interval_days ? Number(formData.maintenance_interval_days) : null,
-      expiry_date: formData.expiry_date || null,
-      purchase_date: formData.purchase_date || null,
-      warranty_expiry: formData.warranty_expiry || null
+      minQuantity: Number(formData.minQuantity), // FIX: Changed min_quantity to minQuantity
+      maxQuantity: formData.maxQuantity ? Number(formData.maxQuantity) : null, // FIX: Changed max_quantity to maxQuantity
+      unitPrice: formData.unitPrice ? Number(formData.unitPrice) : null, // FIX: Changed unit_price to unitPrice
+      maintenanceIntervalDays: formData.maintenanceIntervalDays ? Number(formData.maintenanceIntervalDays) : null, // FIX: Changed maintenance_interval_days to maintenanceIntervalDays
+      expiryDate: formData.expiryDate || null, // FIX: Changed expiry_date to expiryDate
+      purchaseDate: formData.purchaseDate || null, // FIX: Changed purchase_date to purchaseDate
+      warrantyExpiry: formData.warrantyExpiry || null // FIX: Changed warranty_expiry to warrantyExpiry
     };
 
     if (isEditing && item) {
       updateItem({ id: item.id, updates: data });
     } else {
-      createItem(data);
+      // Ensure the type passed to createItem matches the Omit type in useInventory.ts
+      createItem(data as Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt' | 'qrCode'>);
     }
     
     onClose();
@@ -102,8 +104,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
                 Category
               </label>
               <select
-                value={formData.category_id}
-                onChange={(e) => handleInputChange('category_id', e.target.value)}
+                value={formData.categoryId} // FIX: Changed category_id to categoryId
+                onChange={(e) => handleInputChange('categoryId', e.target.value)} // FIX: Changed category_id to categoryId
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select Category</option>
@@ -121,8 +123,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
               </label>
               <select
                 required
-                value={formData.item_type}
-                onChange={(e) => handleInputChange('item_type', e.target.value)}
+                value={formData.itemType} // FIX: Changed item_type to itemType
+                onChange={(e) => handleInputChange('itemType', e.target.value)} // FIX: Changed item_type to itemType
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="equipment">Equipment</option>
@@ -189,8 +191,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
                 type="number"
                 required
                 min="0"
-                value={formData.min_quantity}
-                onChange={(e) => handleInputChange('min_quantity', e.target.value)}
+                value={formData.minQuantity} // FIX: Changed min_quantity to minQuantity
+                onChange={(e) => handleInputChange('minQuantity', e.target.value)} // FIX: Changed min_quantity to minQuantity
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -202,8 +204,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
               <input
                 type="number"
                 min="0"
-                value={formData.max_quantity}
-                onChange={(e) => handleInputChange('max_quantity', e.target.value)}
+                value={formData.maxQuantity} // FIX: Changed max_quantity to maxQuantity
+                onChange={(e) => handleInputChange('maxQuantity', e.target.value)} // FIX: Changed max_quantity to maxQuantity
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -216,8 +218,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
                 type="number"
                 min="0"
                 step="0.01"
-                value={formData.unit_price}
-                onChange={(e) => handleInputChange('unit_price', e.target.value)}
+                value={formData.unitPrice} // FIX: Changed unit_price to unitPrice
+                onChange={(e) => handleInputChange('unitPrice', e.target.value)} // FIX: Changed unit_price to unitPrice
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -245,8 +247,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
               </label>
               <input
                 type="text"
-                value={formData.serial_number}
-                onChange={(e) => handleInputChange('serial_number', e.target.value)}
+                value={formData.serialNumber} // FIX: Changed serial_number to serialNumber
+                onChange={(e) => handleInputChange('serialNumber', e.target.value)} // FIX: Changed serial_number to serialNumber
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter serial number"
               />
@@ -287,8 +289,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
               </label>
               <input
                 type="date"
-                value={formData.purchase_date}
-                onChange={(e) => handleInputChange('purchase_date', e.target.value)}
+                value={formData.purchaseDate} // FIX: Changed purchase_date to purchaseDate
+                onChange={(e) => handleInputChange('purchaseDate', e.target.value)} // FIX: Changed purchase_date to purchaseDate
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -299,8 +301,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
               </label>
               <input
                 type="date"
-                value={formData.expiry_date}
-                onChange={(e) => handleInputChange('expiry_date', e.target.value)}
+                value={formData.expiryDate} // FIX: Changed expiry_date to expiryDate
+                onChange={(e) => handleInputChange('expiryDate', e.target.value)} // FIX: Changed expiry_date to expiryDate
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -311,8 +313,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
               </label>
               <input
                 type="date"
-                value={formData.warranty_expiry}
-                onChange={(e) => handleInputChange('warranty_expiry', e.target.value)}
+                value={formData.warrantyExpiry} // FIX: Changed warranty_expiry to warrantyExpiry
+                onChange={(e) => handleInputChange('warrantyExpiry', e.target.value)} // FIX: Changed warranty_expiry to warrantyExpiry
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
@@ -326,8 +328,8 @@ const InventoryItemModal = memo(({ item, categories, onClose }: InventoryItemMod
             <input
               type="number"
               min="0"
-              value={formData.maintenance_interval_days}
-              onChange={(e) => handleInputChange('maintenance_interval_days', e.target.value)}
+              value={formData.maintenanceIntervalDays} // FIX: Changed maintenance_interval_days to maintenanceIntervalDays
+              onChange={(e) => handleInputChange('maintenanceIntervalDays', e.target.value)} // FIX: Changed maintenance_interval_days to maintenanceIntervalDays
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="e.g., 90 for quarterly maintenance"
             />

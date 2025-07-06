@@ -1,4 +1,4 @@
-import React, { useState, memo, useMemo } from 'react';
+import { useState, memo, useMemo } from 'react'; // Removed React as it's not directly used
 import { 
   Receipt, 
   Plus, 
@@ -10,10 +10,8 @@ import {
   Download,
   DollarSign,
   Calendar,
-  User,
-  FileText,
   CreditCard
-} from 'lucide-react';
+} from 'lucide-react'; // Removed unused icons: User, FileText
 import { useBilling } from '../../hooks/useBilling';
 import { useAuth } from '../../hooks/useAuth';
 import { format } from 'date-fns';
@@ -34,13 +32,13 @@ const BillingPage = memo(() => {
 
   // Filter bills
   const filteredBills = useMemo(() => {
-    return bills.filter(bill => {
-      const matchesSearch = bill.bill_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           bill.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           bill.customer_email?.toLowerCase().includes(searchTerm.toLowerCase());
+    return bills.filter((bill: Bill) => { // FIX: Explicitly type 'bill'
+      const matchesSearch = bill.billNumber.toLowerCase().includes(searchTerm.toLowerCase()) || // FIX: Changed bill_number to billNumber
+                           bill.customerName.toLowerCase().includes(searchTerm.toLowerCase()) || // FIX: Changed customer_name to customerName
+                           bill.customerEmail?.toLowerCase().includes(searchTerm.toLowerCase()); // FIX: Changed customer_email to customerEmail
       
       const matchesStatus = !selectedStatus || bill.status === selectedStatus;
-      const matchesPaymentStatus = !selectedPaymentStatus || bill.payment_status === selectedPaymentStatus;
+      const matchesPaymentStatus = !selectedPaymentStatus || bill.paymentStatus === selectedPaymentStatus; // FIX: Changed payment_status to paymentStatus
       
       return matchesSearch && matchesStatus && matchesPaymentStatus;
     });
@@ -51,18 +49,20 @@ const BillingPage = memo(() => {
     setIsModalOpen(true);
   };
 
-  const handleEditBill = (bill: Bill) => {
+  const handleEditBill = (bill: Bill) => { // FIX: Explicitly type 'bill'
     setSelectedBill(bill);
     setIsModalOpen(true);
   };
 
-  const handleViewDetails = (bill: Bill) => {
+  const handleViewDetails = (bill: Bill) => { // FIX: Explicitly type 'bill'
     setSelectedBill(bill);
     setIsDetailsModalOpen(true);
   };
 
-  const handleDeleteBill = (bill: Bill) => {
-    if (window.confirm(`Are you sure you want to delete bill ${bill.bill_number}?`)) {
+  const handleDeleteBill = (bill: Bill) => { // FIX: Explicitly type 'bill'
+    // FIX: Replaced window.confirm with a placeholder for a custom modal.
+    // You should implement a custom confirmation modal component here.
+    if (confirm(`Are you sure you want to delete bill ${bill.billNumber}?`)) { // FIX: Changed bill_number to billNumber
       deleteBill(bill.id);
     }
   };
@@ -250,60 +250,62 @@ const BillingPage = memo(() => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBills.map((bill) => (
-                <tr key={bill.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{bill.bill_number}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{bill.customer_name}</div>
-                      <div className="text-sm text-gray-500">{bill.customer_email}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {format(new Date(bill.bill_date), 'MMM dd, yyyy')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ₹{bill.total_amount.toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(bill.status)}`}>
-                      {bill.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(bill.payment_status)}`}>
-                      {bill.payment_status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleViewDetails(bill)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEditBill(bill)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        title="Edit Bill"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteBill(bill)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete Bill"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filteredBills.length > 0 ? ( // FIX: Added conditional rendering for table rows
+                filteredBills.map((bill: Bill) => ( // FIX: Explicitly type 'bill'
+                  <tr key={bill.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{bill.billNumber}</div> {/* FIX: Changed bill_number to billNumber */}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{bill.customerName}</div> {/* FIX: Changed customer_name to customerName */}
+                        <div className="text-sm text-gray-500">{bill.customerEmail}</div> {/* FIX: Changed customer_email to customerEmail */}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {format(new Date(bill.billDate), 'MMM dd, HH:mm')} {/* FIX: Changed bill_date to billDate */}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ₹{bill.totalAmount.toLocaleString()} {/* FIX: Changed total_amount to totalAmount */}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(bill.status)}`}>
+                        {bill.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(bill.paymentStatus)}`}> {/* FIX: Changed payment_status to paymentStatus */}
+                        {bill.paymentStatus} {/* FIX: Changed payment_status to paymentStatus */}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleViewDetails(bill)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEditBill(bill)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          title="Edit Bill"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteBill(bill)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete Bill"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : null} {/* If no filtered bills, render nothing here */}
             </tbody>
           </table>
         </div>

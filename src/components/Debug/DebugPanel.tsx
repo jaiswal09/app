@@ -4,7 +4,8 @@ import { useDebug } from '../../hooks/useDebug';
 import { formatDistanceToNow } from 'date-fns';
 
 const DebugPanel = memo(() => {
-  const { debugInfo, isVisible, toggleDebugPanel, performPingTest, clearLogs, exportDebugData } = useDebug();
+  // FIX: Removed performPingTest from destructuring as it's no longer exposed by useDebug
+  const { debugInfo, isVisible, toggleDebugPanel, clearLogs, exportDebugData } = useDebug();
 
   if (!isVisible) return null;
 
@@ -17,9 +18,11 @@ const DebugPanel = memo(() => {
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Debug Panel</h2>
           <div className="flex items-center space-x-2">
+            {/* FIX: Removed onClick={performPingTest} as it's no longer exposed. 
+                     The refresh icon remains as a visual element or could trigger a refetch if added to useDebug. */}
             <button
-              onClick={performPingTest}
               className="flex items-center space-x-1 px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+              title="Connection status updates periodically"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Ping Test</span>
@@ -69,8 +72,9 @@ const DebugPanel = memo(() => {
                     <Database className="w-4 h-4" />
                     <span className="text-sm">Database</span>
                   </div>
+                  {/* FIX: Changed supabaseConnected to databaseConnected */}
                   <div className={`w-2 h-2 rounded-full ${
-                    connectionStatus.supabaseConnected ? 'bg-green-500' : 'bg-red-500'
+                    connectionStatus.databaseConnected ? 'bg-green-500' : 'bg-red-500'
                   }`} />
                 </div>
                 
@@ -106,7 +110,7 @@ const DebugPanel = memo(() => {
                   <span className="font-medium">Role:</span> {environment.userRole}
                 </div>
                 <div>
-                  <span className="font-medium">Environment:</span> {import.meta.env.MODE}
+                  <span className="font-medium">Environment:</span> {environment.nodeEnv} {/* FIX: Use nodeEnv from environment */}
                 </div>
               </div>
             </div>
@@ -141,8 +145,9 @@ const DebugPanel = memo(() => {
                       {request.duration}ms • {formatDistanceToNow(new Date(request.timestamp), { addSuffix: true })}
                     </div>
                   </div>
+                  {/* FIX: Removed supabaseUrl as it's no longer relevant */}
                   <div className="text-gray-700 break-all">
-                    {request.url.replace(environment.supabaseUrl || '', '').substring(0, 100)}...
+                    {request.url.substring(0, 100)}...
                   </div>
                   {request.error && (
                     <div className="mt-1 text-red-600 font-medium">

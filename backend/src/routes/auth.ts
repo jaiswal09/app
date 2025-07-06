@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../server';
+import { prisma } from '../server'; // Assuming prisma is exported from server.ts
 import { logger } from '../utils/logger';
 import { userRegistrationSchema, userLoginSchema } from '../utils/validators';
 
@@ -52,7 +52,7 @@ router.post('/register', async (req, res) => {
 
     logger.info(`New user registered: ${email}`);
 
-    res.status(201).json({
+    return res.status(201).json({ // FIX: Added return
       message: 'User registered successfully',
       user: {
         id: result.profile.id,
@@ -72,7 +72,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    res.status(500).json({ error: 'Registration failed' });
+    return res.status(500).json({ error: 'Registration failed' }); // FIX: Added return
   }
 });
 
@@ -105,6 +105,12 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    // Ensure JWT_SECRET is defined
+    if (!process.env.JWT_SECRET) {
+      logger.error('JWT_SECRET is not defined in environment variables');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { 
@@ -112,13 +118,13 @@ router.post('/login', async (req, res) => {
         email: user.email,
         role: user.profile.role
       },
-      process.env.JWT_SECRET!,
+      process.env.JWT_SECRET as jwt.Secret, // FIX: Explicitly cast to jwt.Secret
       { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
     logger.info(`User logged in: ${email}`);
 
-    res.json({
+    return res.json({ // FIX: Added return
       message: 'Login successful',
       token,
       user: {
@@ -142,11 +148,13 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    res.status(500).json({ error: 'Login failed' });
+    return res.status(500).json({ error: 'Login failed' }); // FIX: Added return
   }
 });
 
 // Get current user profile
+// This endpoint is used to fetch the profile of the currently authenticated user.
+// It expects a JWT token in the Authorization header.
 router.get('/profile', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -156,7 +164,22 @@ router.get('/profile', async (req, res) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    // Ensure JWT_SECRET is defined
+    if (!process.env.JWT_SECRET) {
+      logger.error('JWT_SECRET is not defined in environment variables');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET as jwt.Secret); // FIX: Explicitly cast to jwt.Secret
+    } catch (jwtError: any) {
+      logger.error('JWT verification error:', jwtError);
+      if (jwtError.name === 'JsonWebTokenError' || jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      }
+      return res.status(500).json({ error: 'Failed to verify token' });
+    }
     
     const profile = await prisma.userProfile.findUnique({
       where: { userId: decoded.userId },
@@ -176,7 +199,7 @@ router.get('/profile', async (req, res) => {
       return res.status(404).json({ error: 'Profile not found' });
     }
 
-    res.json({
+    return res.json({ // FIX: Added return
       id: profile.id,
       userId: profile.userId,
       email: profile.email,
@@ -190,12 +213,8 @@ router.get('/profile', async (req, res) => {
     });
   } catch (error: any) {
     logger.error('Profile fetch error:', error);
-    
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-
-    res.status(500).json({ error: 'Failed to fetch profile' });
+    // JWT errors are now handled in the try-catch block for jwt.verify
+    return res.status(500).json({ error: 'Failed to fetch profile' }); // FIX: Added return
   }
 });
 
@@ -208,7 +227,19 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+    // Ensure JWT_SECRET is defined
+    if (!process.env.JWT_SECRET) {
+      logger.error('JWT_SECRET is not defined in environment variables');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET as jwt.Secret); // FIX: Explicitly cast to jwt.Secret
+    } catch (jwtError: any) {
+      logger.error('JWT verification error during refresh:', jwtError);
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
     
     // Check if user still exists and is active
     const user = await prisma.user.findUnique({
@@ -227,11 +258,11 @@ router.post('/refresh', async (req, res) => {
         email: user.email,
         role: user.profile.role
       },
-      process.env.JWT_SECRET!,
+      process.env.JWT_SECRET as jwt.Secret, // FIX: Explicitly cast to jwt.Secret
       { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
     );
 
-    res.json({ 
+    return res.json({ // FIX: Added return
       token: newToken,
       user: {
         id: user.profile.id,
@@ -246,14 +277,15 @@ router.post('/refresh', async (req, res) => {
     });
   } catch (error: any) {
     logger.error('Token refresh error:', error);
-    res.status(401).json({ error: 'Invalid or expired token' });
+    // This catch block will now primarily handle unexpected errors, JWT errors are caught above
+    return res.status(500).json({ error: 'Failed to refresh token' }); // FIX: Added return
   }
 });
 
 // Logout (for logging purposes)
 router.post('/logout', (req, res) => {
   logger.info('User logged out');
-  res.json({ message: 'Logout successful' });
+  return res.json({ message: 'Logout successful' }); // FIX: Added return
 });
 
 export default router;

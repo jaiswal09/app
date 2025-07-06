@@ -1,4 +1,4 @@
-import React, { useState, memo, useMemo } from 'react';
+import { useState, memo, useMemo } from 'react'; // Removed React as it's not directly used
 import { 
   Wrench, 
   Plus, 
@@ -8,18 +8,14 @@ import {
   CheckCircle,
   Clock,
   AlertTriangle,
-  User,
-  DollarSign,
-  Edit,
-  Trash2,
   Eye
-} from 'lucide-react';
+} from 'lucide-react'; // Removed unused icons: User, DollarSign, Edit, Trash2
 import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../hooks/useAuth';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
+import { format, isAfter, isBefore, addDays, isValid } from 'date-fns'; // Import isValid
 import MaintenanceModal from './MaintenanceModal';
 import MaintenanceDetailsModal from './MaintenanceDetailsModal';
-import type { MaintenanceSchedule } from '../../types';
+import type { MaintenanceSchedule } from '../../types'; // Import necessary type
 
 const MaintenancePage = memo(() => {
   const { maintenance, items, isMaintenanceLoading } = useInventory();
@@ -32,14 +28,21 @@ const MaintenancePage = memo(() => {
   const [selectedMaintenance, setSelectedMaintenance] = useState<MaintenanceSchedule | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
+  // Helper function to safely create and check a Date object
+  const createSafeDate = (dateString: string | Date | undefined | null): Date | null => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return isValid(date) ? date : null;
+  };
+
   // Filter maintenance records
   const filteredMaintenance = useMemo(() => {
-    return maintenance.filter(record => {
+    return maintenance.filter((record: MaintenanceSchedule) => { // FIX: Explicitly type 'record'
       const matchesSearch = record.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            record.item?.name?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = !selectedStatus || record.status === selectedStatus;
-      const matchesType = !selectedType || record.maintenance_type === selectedType;
+      const matchesType = !selectedType || record.maintenanceType === selectedType; // FIX: Changed maintenance_type to maintenanceType
       
       return matchesSearch && matchesStatus && matchesType;
     });
@@ -50,16 +53,19 @@ const MaintenancePage = memo(() => {
     const today = new Date();
     const nextWeek = addDays(today, 7);
     
-    const scheduled = maintenance.filter(m => m.status === 'scheduled').length;
-    const inProgress = maintenance.filter(m => m.status === 'in_progress').length;
-    const overdue = maintenance.filter(m => 
-      m.status === 'scheduled' && isBefore(new Date(m.scheduled_date), today)
-    ).length;
-    const upcoming = maintenance.filter(m => 
-      m.status === 'scheduled' && 
-      isAfter(new Date(m.scheduled_date), today) &&
-      isBefore(new Date(m.scheduled_date), nextWeek)
-    ).length;
+    const scheduled = maintenance.filter((m: MaintenanceSchedule) => m.status === 'scheduled').length; // FIX: Explicitly type 'm'
+    const inProgress = maintenance.filter((m: MaintenanceSchedule) => m.status === 'in_progress').length; // FIX: Explicitly type 'm'
+    const overdue = maintenance.filter((m: MaintenanceSchedule) => { // FIX: Explicitly type 'm'
+      const scheduledDate = createSafeDate(m.scheduledDate); // FIX: Changed scheduled_date to scheduledDate
+      return m.status === 'scheduled' && scheduledDate && isBefore(scheduledDate, today); // FIX: Compare valid Date objects
+    }).length;
+    const upcoming = maintenance.filter((m: MaintenanceSchedule) => { // FIX: Explicitly type 'm'
+      const scheduledDate = createSafeDate(m.scheduledDate); // FIX: Changed scheduled_date to scheduledDate
+      return m.status === 'scheduled' && 
+             scheduledDate && 
+             isAfter(scheduledDate, today) &&
+             isBefore(scheduledDate, nextWeek);
+    }).length;
 
     return { scheduled, inProgress, overdue, upcoming };
   }, [maintenance]);
@@ -100,8 +106,9 @@ const MaintenancePage = memo(() => {
     }
   };
 
-  const isOverdue = (record: MaintenanceSchedule) => {
-    return record.status === 'scheduled' && isBefore(new Date(record.scheduled_date), new Date());
+  const isOverdue = (record: MaintenanceSchedule) => { // FIX: Explicitly type 'record'
+    const scheduledDate = createSafeDate(record.scheduledDate); // FIX: Changed scheduled_date to scheduledDate
+    return record.status === 'scheduled' && scheduledDate && isBefore(scheduledDate, new Date());
   };
 
   if (isMaintenanceLoading) {
@@ -256,66 +263,68 @@ const MaintenancePage = memo(() => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredMaintenance.map((record) => (
-                <tr key={record.id} className={`hover:bg-gray-50 ${isOverdue(record) ? 'bg-red-50' : ''}`}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {record.item?.name || 'Unknown Item'}
+              {filteredMaintenance.length > 0 ? ( // FIX: Added conditional rendering for table rows
+                filteredMaintenance.map((record: MaintenanceSchedule) => ( // FIX: Explicitly type 'record'
+                  <tr key={record.id} className={`hover:bg-gray-50 ${isOverdue(record) ? 'bg-red-50' : ''}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {record.item?.name || 'Unknown Item'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {record.description}
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {record.description}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(record.maintenanceType)}`}> {/* FIX: Changed maintenance_type to maintenanceType */}
+                        {record.maintenanceType} {/* FIX: Changed maintenance_type to maintenanceType */}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div>
+                        {format(createSafeDate(record.scheduledDate) || new Date(), 'MMM dd, HH:mm')} {/* FIX: Changed scheduled_date to scheduledDate */}
+                        {isOverdue(record) && (
+                          <div className="text-red-600 text-xs">Overdue</div>
+                        )}
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(record.maintenance_type)}`}>
-                      {record.maintenance_type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div>
-                      {format(new Date(record.scheduled_date), 'MMM dd, yyyy')}
-                      {isOverdue(record) && (
-                        <div className="text-red-600 text-xs">Overdue</div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
-                      {record.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.technician?.full_name || 'Unassigned'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.cost ? `$${record.cost.toLocaleString()}` : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleViewDetails(record)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {canManageInventory && (
-                        <>
-                          <button
-                            onClick={() => handleEditMaintenance(record)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Edit Maintenance"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
+                        {record.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {record.technician?.fullName || 'Unassigned'} {/* FIX: Changed full_name to fullName */}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {record.cost ? `$${record.cost.toLocaleString()}` : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleViewDetails(record)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {canManageInventory && (
+                          <>
+                            <button
+                              onClick={() => handleEditMaintenance(record)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Edit Maintenance"
+                            >
+                              <Wrench className="w-4 h-4" /> {/* FIX: Changed Edit to Wrench for consistency with title */}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : null} {/* If no filtered maintenance, render nothing here */}
             </tbody>
           </table>
         </div>

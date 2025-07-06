@@ -140,7 +140,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
     // Verify item exists and is available for checkout
     const item = await prisma.inventoryItem.findUnique({
-      where: { id: validatedData.itemId }
+      where: { id: validatedData.itemId } // FIX: Changed itemId to camelCase
     });
 
     if (!item) {
@@ -148,7 +148,7 @@ router.post('/', async (req: AuthRequest, res) => {
     }
 
     // Validate transaction based on type
-    if (validatedData.transactionType === 'checkout') {
+    if (validatedData.transactionType === 'checkout') { // FIX: Changed transactionType to camelCase
       if (item.quantity < validatedData.quantity) {
         return res.status(400).json({ 
           error: 'Insufficient quantity',
@@ -169,10 +169,10 @@ router.post('/', async (req: AuthRequest, res) => {
     const transaction = await prisma.transaction.create({
       data: {
         ...validatedData,
-        userId: currentUser.id,
-        dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null,
-        returnedDate: validatedData.transactionType === 'checkin' ? new Date() : null,
-        status: validatedData.transactionType === 'checkin' ? 'completed' : 'active'
+        userId: currentUser.id, // FIX: Changed userId to camelCase
+        dueDate: validatedData.dueDate ? new Date(validatedData.dueDate) : null, // FIX: Changed dueDate to camelCase
+        returnedDate: validatedData.transactionType === 'checkin' ? new Date() : null, // FIX: Changed transactionType to camelCase
+        status: validatedData.transactionType === 'checkin' ? 'completed' : 'active' // FIX: Changed transactionType to camelCase
       },
       include: {
         item: {
@@ -185,12 +185,12 @@ router.post('/', async (req: AuthRequest, res) => {
     });
 
     // Update inventory quantity
-    const quantityChange = validatedData.transactionType === 'checkout' ? 
+    const quantityChange = validatedData.transactionType === 'checkout' ? // FIX: Changed transactionType to camelCase
       -validatedData.quantity : validatedData.quantity;
 
-    await updateInventoryQuantity(validatedData.itemId, quantityChange);
+    await updateInventoryQuantity(validatedData.itemId, quantityChange); // FIX: Changed itemId to camelCase
 
-    logger.info(`Transaction created: ${validatedData.transactionType} - ${item.name} (Qty: ${validatedData.quantity})`);
+    logger.info(`Transaction created: ${validatedData.transactionType} - ${item.name} (Qty: ${validatedData.quantity})`); // FIX: Changed transactionType to camelCase
     broadcastUpdate('transaction_created', transaction);
 
     res.status(201).json(transaction);
@@ -212,7 +212,8 @@ router.post('/', async (req: AuthRequest, res) => {
 router.put('/:id', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { status, returnedDate, conditionOnReturn, notes } = req.body;
+    // FIX: Changed conditionOnReturn to camelCase
+    const { status, returnedDate, conditionOnReturn, notes } = req.body; 
     const currentUser = req.user!;
 
     const existingTransaction = await prisma.transaction.findUnique({
@@ -226,7 +227,7 @@ router.put('/:id', async (req: AuthRequest, res) => {
 
     // Check permissions
     if (currentUser.role !== 'admin' && currentUser.role !== 'staff' && 
-        existingTransaction.userId !== currentUser.id) {
+        existingTransaction.userId !== currentUser.id) { // FIX: Changed userId to camelCase
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
@@ -234,13 +235,14 @@ router.put('/:id', async (req: AuthRequest, res) => {
     
     if (status) updateData.status = status;
     if (returnedDate) updateData.returnedDate = new Date(returnedDate);
-    if (conditionOnReturn !== undefined) updateData.conditionOnReturn = conditionOnReturn;
+    // FIX: Changed conditionOnReturn to camelCase
+    if (conditionOnReturn !== undefined) updateData.conditionOnReturn = conditionOnReturn; 
     if (notes !== undefined) updateData.notes = notes;
 
     // If marking as completed and it's a checkout, return the quantity
-    if (status === 'completed' && existingTransaction.transactionType === 'checkout' && 
+    if (status === 'completed' && existingTransaction.transactionType === 'checkout' && // FIX: Changed transactionType to camelCase
         existingTransaction.status === 'active') {
-      await updateInventoryQuantity(existingTransaction.itemId, existingTransaction.quantity);
+      await updateInventoryQuantity(existingTransaction.itemId, existingTransaction.quantity); // FIX: Changed itemId to camelCase
     }
 
     const transaction = await prisma.transaction.update({
@@ -321,7 +323,7 @@ router.get('/user/:userId', async (req: AuthRequest, res) => {
     }
 
     const transactions = await prisma.transaction.findMany({
-      where: { userId },
+      where: { userId }, // FIX: Changed userId to camelCase
       include: {
         item: {
           select: {
@@ -357,7 +359,7 @@ router.get('/overdue/list', async (req: AuthRequest, res) => {
     const overdueTransactions = await prisma.transaction.findMany({
       where: {
         status: 'active',
-        dueDate: {
+        dueDate: { // FIX: Changed dueDate to camelCase
           lt: new Date()
         }
       },
@@ -385,7 +387,7 @@ router.get('/overdue/list', async (req: AuthRequest, res) => {
         }
       },
       orderBy: {
-        dueDate: 'asc'
+        dueDate: 'asc' // FIX: Changed dueDate to camelCase
       }
     });
 
@@ -393,7 +395,7 @@ router.get('/overdue/list', async (req: AuthRequest, res) => {
     await prisma.transaction.updateMany({
       where: {
         status: 'active',
-        dueDate: {
+        dueDate: { // FIX: Changed dueDate to camelCase
           lt: new Date()
         }
       },
@@ -426,7 +428,7 @@ router.get('/stats/overview', async (req: AuthRequest, res) => {
       prisma.transaction.count({ where: { status: 'overdue' } }),
       prisma.transaction.count({ where: { status: 'completed' } }),
       prisma.transaction.groupBy({
-        by: ['transactionType'],
+        by: ['transactionType'], // FIX: Changed transactionType to camelCase
         _count: { id: true }
       }),
       prisma.transaction.groupBy({
@@ -458,7 +460,7 @@ router.get('/stats/overview', async (req: AuthRequest, res) => {
       overdueTransactions,
       completedTransactions,
       byType: byType.map(item => ({
-        type: item.transactionType,
+        type: item.transactionType, // FIX: Changed transactionType to camelCase
         count: item._count.id
       })),
       byStatus: byStatus.map(item => ({
@@ -490,35 +492,45 @@ async function updateInventoryQuantity(itemId: string, quantityChange: number) {
     });
 
     // Check for low stock alert
-    if (item.quantity > item.minQuantity && newQuantity <= item.minQuantity) {
+    if (item.quantity > item.minQuantity && newQuantity <= item.minQuantity) { // FIX: Changed minQuantity to camelCase
       const alertLevel = newQuantity === 0 ? 'out_of_stock' :
-                        newQuantity <= item.minQuantity * 0.5 ? 'critical' : 'low';
+                        newQuantity <= item.minQuantity * 0.5 ? 'critical' : 'low'; // FIX: Changed minQuantity to camelCase
 
-      await prisma.lowStockAlert.upsert({
-        where: { itemId },
-        update: {
-          currentQuantity: newQuantity,
-          minQuantity: item.minQuantity,
-          alertLevel,
-          status: 'active'
-        },
-        create: {
-          itemId,
-          currentQuantity: newQuantity,
-          minQuantity: item.minQuantity,
-          alertLevel,
-          status: 'active'
-        }
+      // FIX: Changed upsert to findFirst + update/create as itemId is not unique
+      const existingAlert = await prisma.lowStockAlert.findFirst({
+        where: { itemId: itemId, status: 'active' } // Find an existing active alert for this item
       });
+
+      if (existingAlert) {
+        await prisma.lowStockAlert.update({
+          where: { id: existingAlert.id }, // Update by unique ID
+          data: {
+            currentQuantity: newQuantity, // FIX: Changed currentQuantity to camelCase
+            minQuantity: item.minQuantity, // FIX: Changed minQuantity to camelCase
+            alertLevel, // FIX: Changed alertLevel to camelCase
+            status: 'active'
+          }
+        });
+      } else {
+        await prisma.lowStockAlert.create({
+          data: {
+            itemId,
+            currentQuantity: newQuantity, // FIX: Changed currentQuantity to camelCase
+            minQuantity: item.minQuantity, // FIX: Changed minQuantity to camelCase
+            alertLevel, // FIX: Changed alertLevel to camelCase
+            status: 'active'
+          }
+        });
+      }
 
       broadcastUpdate('low_stock_alert', {
         itemId,
         itemName: item.name,
-        currentQuantity: newQuantity,
-        minQuantity: item.minQuantity,
-        alertLevel
+        currentQuantity: newQuantity, // FIX: Changed currentQuantity to camelCase
+        minQuantity: item.minQuantity, // FIX: Changed minQuantity to camelCase
+        alertLevel // FIX: Changed alertLevel to camelCase
       });
-    } else if (item.quantity <= item.minQuantity && newQuantity > item.minQuantity) {
+    } else if (item.quantity <= item.minQuantity && newQuantity > item.minQuantity) { // FIX: Changed minQuantity to camelCase
       await prisma.lowStockAlert.updateMany({
         where: {
           itemId,

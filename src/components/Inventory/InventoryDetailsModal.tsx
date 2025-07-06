@@ -1,6 +1,6 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { X, Package, MapPin, Calendar, DollarSign, AlertTriangle, Wrench, QrCode } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import type { InventoryItem } from '../../types';
 
 interface InventoryDetailsModalProps {
@@ -9,6 +9,13 @@ interface InventoryDetailsModalProps {
 }
 
 const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProps) => {
+  // Helper to safely create a Date object
+  const createSafeDate = (dateString: string | Date | null | undefined): Date | null => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return isValid(date) ? date : null;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available': return 'bg-green-100 text-green-800';
@@ -31,12 +38,13 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
     }
   };
 
-  const stockPercentage = item.max_quantity 
-    ? Math.round((item.quantity / item.max_quantity) * 100)
-    : Math.round((item.quantity / (item.min_quantity * 2)) * 100);
+  // FIX: Changed max_quantity to maxQuantity, min_quantity to minQuantity
+  const stockPercentage = item.maxQuantity 
+    ? Math.round((item.quantity / item.maxQuantity) * 100)
+    : Math.round((item.quantity / ((item.minQuantity || 1) * 2)) * 100); // Ensure minQuantity is not zero for division
 
-  const isLowStock = item.quantity <= item.min_quantity;
-  const isCriticalStock = item.quantity <= item.min_quantity * 0.5;
+  const isLowStock = item.quantity <= item.minQuantity; // FIX: Changed min_quantity to minQuantity
+  const isCriticalStock = item.quantity <= (item.minQuantity || 0) * 0.5; // FIX: Changed min_quantity to minQuantity
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -67,8 +75,8 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(item.status)}`}>
                     {item.status.replace('_', ' ')}
                   </span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(item.item_type)}`}>
-                    {item.item_type}
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getTypeColor(item.itemType)}`}>
+                    {item.itemType}
                   </span>
                   {item.category && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
@@ -77,10 +85,11 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
                   )}
                 </div>
               </div>
-              {item.qr_code && (
+              {/* FIX: Changed qr_code to qrCode and moved comment outside conditional */}
+              {item.qrCode && (
                 <div className="text-center">
                   <QrCode className="w-16 h-16 text-gray-400 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 font-mono">{item.qr_code}</p>
+                  <p className="text-xs text-gray-500 font-mono">{item.qrCode}</p>
                 </div>
               )}
             </div>
@@ -101,12 +110,12 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
                   <div className="text-sm text-gray-500">Current Stock</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-orange-600">{item.min_quantity}</div>
+                  <div className="text-3xl font-bold text-orange-600">{item.minQuantity}</div>
                   <div className="text-sm text-gray-500">Minimum Required</div>
                 </div>
                 <div className="text-center">
                   <div className="text-3xl font-bold text-blue-600">
-                    {item.max_quantity || 'N/A'}
+                    {item.maxQuantity || 'N/A'}
                   </div>
                   <div className="text-sm text-gray-500">Maximum Capacity</div>
                 </div>
@@ -137,8 +146,8 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
               </div>
               <div className="flex justify-between text-xs text-gray-500">
                 <span>0</span>
-                <span>Minimum ({item.min_quantity})</span>
-                {item.max_quantity && <span>Maximum ({item.max_quantity})</span>}
+                <span>Minimum ({item.minQuantity})</span>
+                {item.maxQuantity && <span>Maximum ({item.maxQuantity})</span>}
               </div>
 
               {/* Stock Alerts */}
@@ -182,12 +191,12 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
                   </div>
                 </div>
                 
-                {item.serial_number && (
+                {item.serialNumber && (
                   <div className="flex items-center space-x-3">
                     <Package className="w-5 h-5 text-gray-400" />
                     <div>
                       <div className="text-sm font-medium text-gray-900">Serial Number</div>
-                      <div className="text-sm text-gray-600 font-mono">{item.serial_number}</div>
+                      <div className="text-sm text-gray-600 font-mono">{item.serialNumber}</div>
                     </div>
                   </div>
                 )}
@@ -214,12 +223,12 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
                   </div>
                 )}
                 
-                {item.unit_price && (
+                {item.unitPrice && (
                   <div className="flex items-center space-x-3">
                     <DollarSign className="w-5 h-5 text-gray-400" />
                     <div>
                       <div className="text-sm font-medium text-gray-900">Unit Price</div>
-                      <div className="text-sm text-gray-600">₹{item.unit_price.toLocaleString()}</div>
+                      <div className="text-sm text-gray-600">₹{item.unitPrice.toLocaleString()}</div>
                     </div>
                   </div>
                 )}
@@ -229,7 +238,7 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
                   <div>
                     <div className="text-sm font-medium text-gray-900">Total Value</div>
                     <div className="text-sm text-gray-600">
-                      ₹{((item.unit_price || 0) * item.quantity).toLocaleString()}
+                      ₹{((item.unitPrice || 0) * item.quantity).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -241,37 +250,37 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Important Dates</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {item.purchase_date && (
+              {item.purchaseDate && (
                 <div className="flex items-center space-x-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
                   <div>
                     <div className="text-sm font-medium text-gray-900">Purchase Date</div>
                     <div className="text-sm text-gray-600">
-                      {format(new Date(item.purchase_date), 'MMM dd, yyyy')}
+                      {format(createSafeDate(item.purchaseDate) || new Date(), 'MMM dd, yyyy')}
                     </div>
                   </div>
                 </div>
               )}
               
-              {item.warranty_expiry && (
+              {item.warrantyExpiry && (
                 <div className="flex items-center space-x-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
                   <div>
                     <div className="text-sm font-medium text-gray-900">Warranty Expiry</div>
                     <div className="text-sm text-gray-600">
-                      {format(new Date(item.warranty_expiry), 'MMM dd, yyyy')}
+                      {format(createSafeDate(item.warrantyExpiry) || new Date(), 'MMM dd, yyyy')}
                     </div>
                   </div>
                 </div>
               )}
               
-              {item.expiry_date && (
+              {item.expiryDate && (
                 <div className="flex items-center space-x-3">
                   <Calendar className="w-5 h-5 text-gray-400" />
                   <div>
                     <div className="text-sm font-medium text-gray-900">Expiry Date</div>
                     <div className="text-sm text-gray-600">
-                      {format(new Date(item.expiry_date), 'MMM dd, yyyy')}
+                      {format(createSafeDate(item.expiryDate) || new Date(), 'MMM dd, yyyy')}
                     </div>
                   </div>
                 </div>
@@ -280,40 +289,40 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
           </div>
 
           {/* Maintenance Information */}
-          {(item.maintenance_interval_days || item.last_maintenance || item.next_maintenance) && (
+          {(item.maintenanceIntervalDays || item.lastMaintenance || item.nextMaintenance) && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 mb-4">Maintenance Information</h3>
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {item.maintenance_interval_days && (
+                  {item.maintenanceIntervalDays && (
                     <div className="flex items-center space-x-3">
                       <Wrench className="w-5 h-5 text-gray-400" />
                       <div>
                         <div className="text-sm font-medium text-gray-900">Maintenance Interval</div>
-                        <div className="text-sm text-gray-600">{item.maintenance_interval_days} days</div>
+                        <div className="text-sm text-gray-600">{item.maintenanceIntervalDays} days</div>
                       </div>
                     </div>
                   )}
                   
-                  {item.last_maintenance && (
+                  {item.lastMaintenance && (
                     <div className="flex items-center space-x-3">
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <div>
                         <div className="text-sm font-medium text-gray-900">Last Maintenance</div>
                         <div className="text-sm text-gray-600">
-                          {format(new Date(item.last_maintenance), 'MMM dd, yyyy')}
+                          {format(createSafeDate(item.lastMaintenance) || new Date(), 'MMM dd, yyyy')}
                         </div>
                       </div>
                     </div>
                   )}
                   
-                  {item.next_maintenance && (
+                  {item.nextMaintenance && (
                     <div className="flex items-center space-x-3">
                       <Calendar className="w-5 h-5 text-gray-400" />
                       <div>
                         <div className="text-sm font-medium text-gray-900">Next Maintenance</div>
                         <div className="text-sm text-gray-600">
-                          {format(new Date(item.next_maintenance), 'MMM dd, yyyy')}
+                          {format(createSafeDate(item.nextMaintenance) || new Date(), 'MMM dd, yyyy')}
                         </div>
                       </div>
                     </div>
@@ -339,11 +348,11 @@ const InventoryDetailsModal = memo(({ item, onClose }: InventoryDetailsModalProp
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-600">
               <div>
                 <label className="text-sm font-medium text-gray-500">Created</label>
-                <p>{format(new Date(item.created_at), 'MMM dd, yyyy HH:mm')}</p>
+                <p>{format(createSafeDate(item.createdAt) || new Date(), 'MMM dd, yyyy HH:mm')}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Last Updated</label>
-                <p>{format(new Date(item.updated_at), 'MMM dd, yyyy HH:mm')}</p>
+                <p>{format(createSafeDate(item.updatedAt) || new Date(), 'MMM dd, yyyy HH:mm')}</p>
               </div>
             </div>
           </div>

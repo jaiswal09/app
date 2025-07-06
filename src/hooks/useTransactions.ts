@@ -1,40 +1,40 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+// Corrected import: Import 'transactionsApi' directly, not a generic 'api'
+import { transactionsApi } from '../lib/api'; 
 import type { Transaction } from '../types';
 import { toast } from 'react-hot-toast';
 
 export const useTransactions = () => {
   const queryClient = useQueryClient();
 
-  // Mutation to create a transaction with ACID properties
+  // Mutation to create a transaction
   const createTransactionMutation = useMutation({
-    mutationFn: async (transactionData: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>) => {
-      // Use the ACID-compliant function for transaction creation
-      const { data, error } = await supabase.rpc('create_transaction_with_inventory_update', {
-        p_item_id: transactionData.item_id,
-        p_user_id: transactionData.user_id,
-        p_transaction_type: transactionData.transaction_type,
-        p_quantity: transactionData.quantity,
-        p_due_date: transactionData.due_date || null,
-        p_location_used: transactionData.location_used || null,
-        p_notes: transactionData.notes || null
-      });
+    mutationFn: async (transactionData: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => { // FIX: Changed 'created_at' and 'updated_at' to 'createdAt' and 'updatedAt' (camelCase)
+      // Use the specific transactionsApi client to create a transaction
+      // Assuming transactionsApi has a 'create' method as seen in useInventory.ts
+      const response = await transactionsApi.create(transactionData); 
       
-      if (error) throw error;
-      return data;
+      // Add error handling similar to useInventory hook
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      return response.data;
     },
     onSuccess: () => {
+      // Invalidate relevant queries to refetch data after a successful transaction creation
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['low-stock-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] }); // Transactions affect inventory
+      queryClient.invalidateQueries({ queryKey: ['low-stock-alerts'] }); // May affect alerts
       toast.success('Transaction created successfully!');
     },
     onError: (error: any) => {
+      // Display a toast notification for errors
       toast.error(error.message || 'Failed to create transaction');
     }
   });
 
   return {
+    // Expose the mutation function and its pending state
     createTransaction: createTransactionMutation.mutate,
     isCreatingTransaction: createTransactionMutation.isPending,
   };

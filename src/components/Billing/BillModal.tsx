@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import { useState, memo } from 'react';
 import { X, Save, Loader2, Plus, Trash2, Search, AlertTriangle } from 'lucide-react';
 import { useBilling } from '../../hooks/useBilling';
 import { addDays, format } from 'date-fns';
@@ -10,19 +10,20 @@ interface BillModalProps {
 }
 
 const BillModal = memo(({ bill, onClose }: BillModalProps) => {
+  // Assuming useBilling provides availableItems and its loading state
   const { createBill, updateBill, availableItems, isCreatingBill, isUpdatingBill, isLoadingAvailableItems } = useBilling();
   const isEditing = !!bill;
   const isLoading = isCreatingBill || isUpdatingBill;
 
   const [formData, setFormData] = useState({
-    customer_name: bill?.customer_name || '',
-    customer_email: bill?.customer_email || '',
-    customer_phone: bill?.customer_phone || '',
-    customer_address: bill?.customer_address || '',
-    bill_date: bill?.bill_date || format(new Date(), 'yyyy-MM-dd'),
-    due_date: bill?.due_date || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-    tax_rate: bill?.tax_rate || 18,
-    discount_amount: bill?.discount_amount || 0,
+    customerName: bill?.customerName || '',
+    customerEmail: bill?.customerEmail || '',
+    customerPhone: bill?.customerPhone || '',
+    customerAddress: bill?.customerAddress || '',
+    billDate: bill?.billDate || format(new Date(), 'yyyy-MM-dd'),
+    dueDate: bill?.dueDate || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+    taxRate: bill?.taxRate || 18,
+    discountAmount: bill?.discountAmount || 0,
     notes: bill?.notes || '',
     status: bill?.status || 'draft' as const
   });
@@ -35,12 +36,12 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
   const filteredItems = availableItems.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
     item.quantity > 0 &&
-    item.unit_price > 0
+    (item.unitPrice || 0) > 0
   );
 
   const addItem = (inventoryItem: any) => {
     // Check if item is already in the bill
-    const existingItemIndex = billItems.findIndex(item => item.item_id === inventoryItem.id);
+    const existingItemIndex = billItems.findIndex(item => item.itemId === inventoryItem.id);
     
     if (existingItemIndex >= 0) {
       // Update existing item quantity
@@ -50,19 +51,19 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
       if (currentQuantity < maxQuantity) {
         updateItem(existingItemIndex, 'quantity', currentQuantity + 1);
       } else {
-        alert(`Maximum available quantity for ${inventoryItem.name} is ${maxQuantity}`);
+        window.alert(`Maximum available quantity for ${inventoryItem.name} is ${maxQuantity}`); 
       }
     } else {
       // Add new item
       const newItem: BillItem = {
-        id: Date.now().toString(),
-        bill_id: bill?.id || '',
-        item_id: inventoryItem.id,
-        item_name: inventoryItem.name,
-        item_description: inventoryItem.description || '',
+        id: Date.now().toString(), // Client-side ID for new items
+        billId: bill?.id || '',
+        itemId: inventoryItem.id,
+        itemName: inventoryItem.name,
+        itemDescription: inventoryItem.description || '',
         quantity: 1,
-        unit_price: inventoryItem.unit_price || 0,
-        total_price: inventoryItem.unit_price || 0
+        unitPrice: inventoryItem.unitPrice || 0,
+        totalPrice: inventoryItem.unitPrice || 0
       };
       
       setBillItems(prev => [...prev, newItem]);
@@ -79,17 +80,17 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
         
         // Validate quantity against available stock
         if (field === 'quantity') {
-          const inventoryItem = availableItems.find(inv => inv.id === item.item_id);
+          const inventoryItem = availableItems.find(inv => inv.id === item.itemId);
           const maxQuantity = inventoryItem?.quantity || 0;
           
           if (value > maxQuantity) {
-            alert(`Maximum available quantity for ${item.item_name} is ${maxQuantity}`);
+            window.alert(`Maximum available quantity for ${item.itemName} is ${maxQuantity}`);
             return item; // Don't update if exceeds available stock
           }
         }
         
-        if (field === 'quantity' || field === 'unit_price') {
-          updatedItem.total_price = updatedItem.quantity * updatedItem.unit_price;
+        if (field === 'quantity' || field === 'unitPrice') {
+          updatedItem.totalPrice = updatedItem.quantity * updatedItem.unitPrice;
         }
         return updatedItem;
       }
@@ -102,13 +103,13 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
   };
 
   // Calculate totals
-  const subtotal = billItems.reduce((sum, item) => sum + item.total_price, 0);
-  const taxAmount = subtotal * (formData.tax_rate / 100);
-  const totalAmount = subtotal + taxAmount - formData.discount_amount;
+  const subtotal = billItems.reduce((sum, item) => sum + item.totalPrice, 0);
+  const taxAmount = subtotal * (formData.taxRate / 100);
+  const totalAmount = subtotal + taxAmount - formData.discountAmount;
 
   // Check for stock availability issues
   const stockIssues = billItems.filter(item => {
-    const inventoryItem = availableItems.find(inv => inv.id === item.item_id);
+    const inventoryItem = availableItems.find(inv => inv.id === item.itemId);
     return !inventoryItem || item.quantity > inventoryItem.quantity;
   });
 
@@ -116,27 +117,27 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
     e.preventDefault();
     
     if (billItems.length === 0) {
-      alert('Please add at least one item to the bill');
+      window.alert('Please add at least one item to the bill');
       return;
     }
 
     if (stockIssues.length > 0) {
-      alert('Please resolve stock availability issues before creating the bill');
+      window.alert('Please resolve stock availability issues before creating the bill');
       return;
     }
 
     const billData = {
       ...formData,
       subtotal,
-      tax_amount: taxAmount,
-      total_amount: totalAmount,
+      taxAmount,
+      totalAmount,
       items: billItems
     };
 
     if (isEditing && bill) {
       updateBill({ id: bill.id, updates: billData });
     } else {
-      createBill(billData);
+      createBill(billData as Omit<Bill, 'id' | 'billNumber' | 'createdAt' | 'updatedAt' | 'paymentStatus' | 'payments' | 'approver' | 'approverId'>);
     }
     
     onClose();
@@ -175,8 +176,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 <input
                   type="text"
                   required
-                  value={formData.customer_name}
-                  onChange={(e) => handleInputChange('customer_name', e.target.value)}
+                  value={formData.customerName}
+                  onChange={(e) => handleInputChange('customerName', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter customer name"
                 />
@@ -188,8 +189,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 </label>
                 <input
                   type="email"
-                  value={formData.customer_email}
-                  onChange={(e) => handleInputChange('customer_email', e.target.value)}
+                  value={formData.customerEmail}
+                  onChange={(e) => handleInputChange('customerEmail', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter email address"
                 />
@@ -201,8 +202,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 </label>
                 <input
                   type="tel"
-                  value={formData.customer_phone}
-                  onChange={(e) => handleInputChange('customer_phone', e.target.value)}
+                  value={formData.customerPhone}
+                  onChange={(e) => handleInputChange('customerPhone', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter phone number"
                 />
@@ -231,8 +232,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 Address
               </label>
               <textarea
-                value={formData.customer_address}
-                onChange={(e) => handleInputChange('customer_address', e.target.value)}
+                value={formData.customerAddress}
+                onChange={(e) => handleInputChange('customerAddress', e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Enter customer address"
@@ -251,8 +252,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 <input
                   type="date"
                   required
-                  value={formData.bill_date}
-                  onChange={(e) => handleInputChange('bill_date', e.target.value)}
+                  value={formData.billDate}
+                  onChange={(e) => handleInputChange('billDate', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -263,8 +264,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 </label>
                 <input
                   type="date"
-                  value={formData.due_date}
-                  onChange={(e) => handleInputChange('due_date', e.target.value)}
+                  value={formData.dueDate}
+                  onChange={(e) => handleInputChange('dueDate', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -278,8 +279,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                   min="0"
                   max="100"
                   step="0.01"
-                  value={formData.tax_rate}
-                  onChange={(e) => handleInputChange('tax_rate', parseFloat(e.target.value) || 0)}
+                  value={formData.taxRate}
+                  onChange={(e) => handleInputChange('taxRate', parseFloat(e.target.value) || 0)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
               </div>
@@ -309,11 +310,11 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 </div>
                 <ul className="mt-2 text-sm text-red-700">
                   {stockIssues.map((item, index) => {
-                    const inventoryItem = availableItems.find(inv => inv.id === item.item_id);
+                    const inventoryItem = availableItems.find(inv => inv.id === item.itemId);
                     const availableQty = inventoryItem?.quantity || 0;
                     return (
                       <li key={index}>
-                        {item.item_name}: Requested {item.quantity}, Available {availableQty}
+                        {item.itemName}: Requested {item.quantity}, Available {availableQty}
                       </li>
                     );
                   })}
@@ -352,10 +353,10 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                           <div>
                             <div className="font-medium text-gray-900">{item.name}</div>
                             <div className="text-sm text-gray-500">{item.description}</div>
-                            <div className="text-xs text-gray-400">{item.category_name}</div>
+                            <div className="text-xs text-gray-400">{item.category?.name}</div>
                           </div>
                           <div className="text-right">
-                            <div className="font-medium text-gray-900">₹{item.unit_price}</div>
+                            <div className="font-medium text-gray-900">₹{item.unitPrice}</div>
                             <div className="text-sm text-gray-500">Stock: {item.quantity}</div>
                             <div className="text-xs text-gray-400">{item.location}</div>
                           </div>
@@ -388,7 +389,7 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {billItems.map((item, index) => {
-                    const inventoryItem = availableItems.find(inv => inv.id === item.item_id);
+                    const inventoryItem = availableItems.find(inv => inv.id === item.itemId);
                     const availableQty = inventoryItem?.quantity || 0;
                     const hasStockIssue = item.quantity > availableQty;
                     
@@ -396,8 +397,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                       <tr key={index} className={hasStockIssue ? 'bg-red-50' : ''}>
                         <td className="px-4 py-3">
                           <div>
-                            <div className="font-medium text-gray-900">{item.item_name}</div>
-                            <div className="text-sm text-gray-500">{item.item_description}</div>
+                            <div className="font-medium text-gray-900">{item.itemName}</div>
+                            <div className="text-sm text-gray-500">{item.itemDescription}</div>
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -422,12 +423,12 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={item.unit_price}
-                            onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                            value={item.unitPrice}
+                            onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
                           />
                         </td>
-                        <td className="px-4 py-3 font-medium">₹{item.total_price.toLocaleString()}</td>
+                        <td className="px-4 py-3 font-medium">₹{item.totalPrice.toLocaleString()}</td>
                         <td className="px-4 py-3">
                           <button
                             type="button"
@@ -459,7 +460,7 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                 <span className="font-medium">₹{subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Tax ({formData.tax_rate}%):</span>
+                <span className="text-gray-600">Tax ({formData.taxRate}%):</span>
                 <span className="font-medium">₹{taxAmount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
@@ -469,8 +470,8 @@ const BillModal = memo(({ bill, onClose }: BillModalProps) => {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.discount_amount}
-                    onChange={(e) => handleInputChange('discount_amount', parseFloat(e.target.value) || 0)}
+                    value={formData.discountAmount}
+                    onChange={(e) => handleInputChange('discountAmount', parseFloat(e.target.value) || 0)}
                     className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-right"
                   />
                 </div>

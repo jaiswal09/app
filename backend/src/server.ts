@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
+import { WebSocketServer, WebSocket } from 'ws'; // Import WebSocket type
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { logger } from './utils/logger';
@@ -37,20 +37,45 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 // Global WebSocket clients storage
-export const wsClients = new Set<any>();
+// Add a 'isAlive' property to each WebSocket for heartbeat tracking
+export const wsClients = new Set<WebSocket & { isAlive: boolean }>();
+
+// --- WebSocket Heartbeat Implementation ---
+const interval = setInterval(() => {
+  wsClients.forEach((ws) => {
+    if (ws.isAlive === false) {
+      logger.warn('Terminating unresponsive WebSocket connection');
+      return ws.terminate(); // Terminate if no pong received from previous ping
+    }
+
+    ws.isAlive = false; // Mark as not alive
+    ws.ping(); // Send ping
+  });
+}, 30000); // Ping every 30 seconds (adjust as needed)
+
+wss.on('close', () => {
+  clearInterval(interval); // Clear interval when WebSocket server closes
+});
 
 wss.on('connection', (ws) => {
   logger.info('New WebSocket connection established');
-  wsClients.add(ws);
+  (ws as any).isAlive = true; // Initialize isAlive for new connection
+
+  wsClients.add(ws as WebSocket & { isAlive: boolean });
   
-  ws.on('close', () => {
-    logger.info('WebSocket connection closed');
-    wsClients.delete(ws);
+  // Respond to pings from client (or mark as alive when pong received)
+  ws.on('pong', () => {
+    (ws as any).isAlive = true;
+  });
+
+  ws.on('close', (code, reason) => {
+    logger.info(`WebSocket connection closed. Code: ${code}, Reason: ${reason ? reason.toString() : 'N/A'}`);
+    wsClients.delete(ws as WebSocket & { isAlive: boolean });
   });
   
   ws.on('error', (error) => {
     logger.error('WebSocket error:', error);
-    wsClients.delete(ws);
+    wsClients.delete(ws as WebSocket & { isAlive: boolean });
   });
 });
 
@@ -63,7 +88,8 @@ export const broadcastUpdate = (type: string, data: any) => {
         client.send(message);
       } catch (error) {
         logger.error('Error sending WebSocket message:', error);
-        wsClients.delete(client);
+        // Remove client if sending fails (likely disconnected)
+        wsClients.delete(client); 
       }
     }
   });
@@ -94,13 +120,27 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+// Health check endpoint - NOW INCLUDES DATABASE CONNECTION CHECK
+app.get('/health', async (req, res) => { 
+  let dbConnected = false;
+  try {
+    await prisma.$connect(); // Attempt to connect to the database
+    dbConnected = true;
+    await prisma.$disconnect(); // Disconnect immediately after checking
+  } catch (error) {
+    logger.error('Database health check failed:', error);
+    dbConnected = false;
+  }
+
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    database: { // This object is crucial for the frontend debug panel
+      connected: dbConnected,
+      type: 'SQLite' // Or 'PostgreSQL', etc.
+    }
   });
 });
 
@@ -127,12 +167,18 @@ app.use('*', (req, res) => {
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully...');
   await prisma.$disconnect();
+  // Close all WebSocket connections on shutdown
+  wsClients.forEach(ws => ws.terminate());
+  clearInterval(interval); // Clear the heartbeat interval
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully...');
   await prisma.$disconnect();
+  // Close all WebSocket connections on shutdown
+  wsClients.forEach(ws => ws.terminate());
+  clearInterval(interval); // Clear the heartbeat interval
   process.exit(0);
 });
 

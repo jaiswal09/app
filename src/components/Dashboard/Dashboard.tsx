@@ -2,19 +2,27 @@ import React, { memo, useMemo } from 'react';
 import { Package, AlertTriangle, ArrowRightLeft, Wrench, TrendingUp, DollarSign } from 'lucide-react';
 import { useInventory } from '../../hooks/useInventory';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { format, subDays, startOfDay } from 'date-fns';
+import { format, subDays, startOfDay, isValid } from 'date-fns'; // Import isValid for robust date checking
 
 const Dashboard = memo(() => {
   const { items, transactions, alerts, maintenance, stats, isLoading } = useInventory();
+
+  // Helper function to safely create and check a Date object
+  const createSafeDate = (dateString: string | Date | undefined | null): Date | null => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return isValid(date) ? date : null;
+  };
 
   // Generate usage stats for the last 7 days
   const usageStats = useMemo(() => {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = startOfDay(subDays(new Date(), i));
-      const dayTransactions = transactions.filter(t => 
-        new Date(t.created_at) >= date && 
-        new Date(t.created_at) < new Date(date.getTime() + 24 * 60 * 60 * 1000)
-      );
+      
+      const dayTransactions = transactions.filter(t => {
+        const transactionDate = createSafeDate(t.created_at);
+        return transactionDate && transactionDate >= date && transactionDate < new Date(date.getTime() + 24 * 60 * 60 * 1000);
+      });
       
       return {
         date: format(date, 'MMM dd'),
@@ -43,7 +51,9 @@ const Dashboard = memo(() => {
 
   // Recent activity
   const recentActivity = useMemo(() => {
+    // Filter out transactions with invalid dates early to prevent errors in mapping
     return transactions
+      .filter(transaction => createSafeDate(transaction.created_at) !== null)
       .slice(0, 10)
       .map(transaction => ({
         ...transaction,
@@ -55,10 +65,10 @@ const Dashboard = memo(() => {
   // Maintenance due
   const maintenanceDue = useMemo(() => {
     const today = new Date();
-    return maintenance.filter(m => 
-      m.status === 'scheduled' && 
-      new Date(m.scheduled_date) <= today
-    ).length;
+    return maintenance.filter(m => {
+      const scheduledDate = createSafeDate(m.scheduled_date);
+      return m.status === 'scheduled' && scheduledDate && scheduledDate <= today;
+    }).length;
   }, [maintenance]);
 
   const statCards = [
@@ -67,42 +77,42 @@ const Dashboard = memo(() => {
       value: stats.totalItems,
       icon: Package,
       color: 'blue',
-      change: '+12%'
+      change: '+12%' // Placeholder, ideally derived from actual data
     },
     {
       title: 'Low Stock Alerts',
       value: stats.lowStockItems,
       icon: AlertTriangle,
       color: 'orange',
-      change: '+3'
+      change: '+3' // Placeholder
     },
     {
       title: 'Active Transactions',
       value: stats.activeTransactions,
       icon: ArrowRightLeft,
       color: 'green',
-      change: '+8'
+      change: '+8' // Placeholder
     },
     {
       title: 'Maintenance Due',
-      value: maintenanceDue,
+      value: maintenanceDue, // Using the calculated maintenanceDue
       icon: Wrench,
       color: 'red',
-      change: '-2'
+      change: '-2' // Placeholder
     },
     {
       title: 'Total Value',
       value: `₹${stats.totalValue.toLocaleString()}`,
       icon: DollarSign,
       color: 'purple',
-      change: '+5.2%'
+      change: '+5.2%' // Placeholder
     },
     {
       title: 'Overdue Items',
       value: stats.overdueItems,
       icon: TrendingUp,
       color: 'red',
-      change: '-1'
+      change: '-1' // Placeholder
     }
   ];
 
@@ -255,7 +265,10 @@ const Dashboard = memo(() => {
                       {activity.quantity}
                     </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {format(new Date(activity.created_at), 'MMM dd, HH:mm')}
+                      {/* FIX: Apply safe date parsing here (Line 258) */}
+                      {createSafeDate(activity.created_at)
+                        ? format(createSafeDate(activity.created_at)!, 'MMM dd, HH:mm')
+                        : 'N/A'}
                     </td>
                   </tr>
                 ))}
@@ -290,7 +303,8 @@ const Dashboard = memo(() => {
                   alert.alert_level === 'out_of_stock' ? 'bg-red-100 text-red-800' :
                   'bg-orange-100 text-orange-800'
                 }`}>
-                  {alert.alert_level.replace('_', ' ')}
+                  {/* FIX: Apply safe string access for alert_level */}
+                  {(alert.alert_level || '').replace('_', ' ')}
                 </span>
               </div>
             ))}

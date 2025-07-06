@@ -1,17 +1,62 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
-import type { DebugInfo, ConnectionStatus } from '../types';
+import { websocketApi } from '../lib/api'; // Import your websocketApi
+import { useAuth } from './useAuth'; // Assuming useAuth provides user/profile for environment info
 
-let requestId = 0;
+// Types for debug info
+interface DebugInfo {
+  connectionStatus: {
+    online: boolean;
+    backendConnected: boolean;
+    realtimeConnected: boolean;
+    databaseConnected: boolean; // Renamed from supabaseConnected for clarity
+    latency?: number;
+  };
+  apiRequests: Array<{
+    id: number;
+    method: string;
+    url: string;
+    status: number;
+    duration: number;
+    timestamp: string;
+    error?: string; // Added error property for failed requests
+  }>;
+  realtimeEvents: Array<{
+    id: number;
+    type: string;
+    data: any;
+    timestamp: string;
+    // Add more specific fields if your real-time events have them (e.g., eventType, table)
+    eventType?: string;
+    table?: string;
+    payload?: any;
+  }>;
+  environment: {
+    userAgent?: string;
+    viewport?: string;
+    timestamp?: string;
+    projectId?: string; // From environment variables
+    userId?: string | null; // From useAuth
+    userRole?: string | null; // From useAuth
+    nodeEnv?: string; // From import.meta.env.MODE
+  };
+}
+
+// Using global arrays for logs to persist across hook re-renders
+// This is a common pattern for debugging utilities where you want to retain logs
+let requestIdCounter = 0; // Use a distinct counter for requests
+let eventIdCounter = 0;   // Use a distinct counter for events
 const debugRequests: DebugInfo['apiRequests'] = [];
 const realtimeEvents: DebugInfo['realtimeEvents'] = [];
 
 export const useDebug = () => {
+  const { user, profile } = useAuth(); // Get user and profile from useAuth for environment info
+
   const [debugInfo, setDebugInfo] = useState<DebugInfo>({
     connectionStatus: {
       online: navigator.onLine,
-      supabaseConnected: false,
-      realtimeConnected: false
+      backendConnected: false,
+      realtimeConnected: false,
+      databaseConnected: false // Initialize here
     },
     apiRequests: [],
     realtimeEvents: [],
@@ -21,116 +66,150 @@ export const useDebug = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   // Connection status checking
-  const checkConnectionStatus = useCallback(async (): Promise<ConnectionStatus> => {
+  const checkConnectionStatus = useCallback(async () => {
     const startTime = Date.now();
+    let backendConnected = false;
+    let databaseConnected = false;
+    let latency: number | undefined;
     
     try {
-      // Test basic Supabase connection
-      const { error } = await supabase.from('categories').select('count').limit(1);
-      const latency = Date.now() - startTime;
+      const response = await fetch('http://localhost:3001/health');
+      latency = Date.now() - startTime;
       
-      const status: ConnectionStatus = {
-        online: navigator.onLine,
-        supabaseConnected: !error,
-        realtimeConnected: true, // Simplified check
-        lastPing: Date.now(),
-        latency
-      };
-      
-      return status;
+      if (response.ok) {
+        backendConnected = true;
+        const healthData = await response.json();
+        databaseConnected = healthData.database?.connected || false; // FIX: Read database status
+      }
     } catch (error) {
-      return {
-        online: navigator.onLine,
-        supabaseConnected: false,
-        realtimeConnected: false,
-        lastPing: Date.now(),
-        latency: Date.now() - startTime
-      };
+      // Backend connection failed
+      backendConnected = false;
+      databaseConnected = false;
     }
+
+    return {
+      online: navigator.onLine,
+      backendConnected,
+      realtimeConnected: websocketApi.isConnected(), // Still check WS directly
+      databaseConnected, // Include database status
+      latency
+    };
   }, []);
 
-  // API request interceptor
+  // Update connection status periodically AND listen to WebSocket changes
+  useEffect(() => {
+    const updateAllStatuses = async () => {
+      const status = await checkConnectionStatus();
+      setDebugInfo(prev => ({
+        ...prev,
+        connectionStatus: {
+          ...status, 
+          realtimeConnected: websocketApi.isConnected(), // Ensure this is always current
+        }
+      }));
+    };
+
+    updateAllStatuses();
+    const interval = setInterval(updateAllStatuses, 3000); // Check every 3 seconds for more responsive status updates
+
+    const handleOnline = () => updateAllStatuses();
+    const handleOffline = () => updateAllStatuses();
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // FIX: Subscribe to WebSocket events for immediate realtime status updates
+    const unsubscribeWs = websocketApi.subscribe((message) => {
+      // On any WS message (including pings/pongs from the server), re-check status
+      updateAllStatuses(); 
+      // Also log the real-time event if it's not a simple ping/pong
+      if (typeof message === 'object' && message !== null && message.type) {
+        logRealtimeEvent(message); // Pass the full message object
+      }
+    });
+
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      unsubscribeWs(); // Unsubscribe from WebSocket
+    };
+  }, [checkConnectionStatus]); // Dependency array includes checkConnectionStatus
+
+  // Environment info (updated to include user/role from useAuth)
+  useEffect(() => {
+    setDebugInfo(prev => ({
+      ...prev,
+      environment: {
+        userAgent: navigator.userAgent,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+        timestamp: new Date().toISOString(),
+        projectId: 'your-project-id-here', // FIX: Replace with actual project ID from env if available
+        userId: user?.id || null, 
+        userRole: profile?.role || null, 
+        nodeEnv: import.meta.env.MODE, 
+      }
+    }));
+  }, [user, profile]); // Re-run if user or profile changes
+
+  // Log API request
   const logApiRequest = useCallback((method: string, url: string, status: number, duration: number, error?: string) => {
     const request = {
-      id: (++requestId).toString(),
+      id: ++requestIdCounter, // FIX: Use distinct counter
       method,
       url,
       status,
       duration,
       timestamp: new Date().toISOString(),
-      error
+      error // Include error message if provided
     };
+
+    debugRequests.push(request);
     
-    debugRequests.unshift(request);
-    if (debugRequests.length > 50) debugRequests.pop(); // Keep only last 50
-    
+    // Keep only last 50 requests
+    if (debugRequests.length > 50) {
+      debugRequests.shift();
+    }
+
     setDebugInfo(prev => ({
       ...prev,
       apiRequests: [...debugRequests]
     }));
   }, []);
 
-  // Realtime event interceptor
-  const logRealtimeEvent = useCallback((type: string, table: string, eventType: string, payload?: any) => {
+  // Log realtime event
+  const logRealtimeEvent = useCallback((eventData: any) => { // FIX: Accept full event data
     const event = {
-      id: Date.now().toString(),
-      type,
-      table,
-      eventType,
+      id: ++eventIdCounter, // FIX: Use distinct counter
+      type: eventData.type, // Assuming eventData has a 'type'
+      data: eventData.data, // Assuming eventData has a 'data' payload
       timestamp: new Date().toISOString(),
-      payload
+      eventType: eventData.eventType || eventData.type, // Use eventType if available, else type
+      table: eventData.table, // Assuming eventData has a 'table'
+      payload: eventData.payload || eventData.data // Assuming eventData has a 'payload' or use data
     };
+
+    realtimeEvents.push(event);
     
-    realtimeEvents.unshift(event);
-    if (realtimeEvents.length > 30) realtimeEvents.pop(); // Keep only last 30
-    
+    // Keep only last 50 events
+    if (realtimeEvents.length > 50) {
+      realtimeEvents.shift();
+    }
+
     setDebugInfo(prev => ({
       ...prev,
       realtimeEvents: [...realtimeEvents]
     }));
   }, []);
 
-  // Environment info
-  const updateEnvironmentInfo = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      let userProfile = null;
-      
-      if (user) {
-        const { data } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-        userProfile = data;
-      }
-
-      setDebugInfo(prev => ({
-        ...prev,
-        environment: {
-          supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-          projectId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0],
-          userId: user?.id,
-          userRole: userProfile?.role
-        }
-      }));
-    } catch (error) {
-      console.warn('Failed to update environment info:', error);
-    }
+  // Toggle debug panel visibility
+  const toggleDebugPanel = useCallback(() => {
+    setIsVisible(prev => !prev);
   }, []);
 
-  // Ping test
-  const performPingTest = useCallback(async () => {
-    const status = await checkConnectionStatus();
-    setDebugInfo(prev => ({
-      ...prev,
-      connectionStatus: status
-    }));
-    return status;
-  }, [checkConnectionStatus]);
-
-  // Clear logs
-  const clearLogs = useCallback(() => {
+  // Clear debug data
+  const clearLogs = useCallback(() => { // FIX: Renamed from clearDebugData to match DebugPanel prop
     debugRequests.length = 0;
     realtimeEvents.length = 0;
     setDebugInfo(prev => ({
@@ -140,155 +219,41 @@ export const useDebug = () => {
     }));
   }, []);
 
-  // Toggle debug panel
-  const toggleDebugPanel = useCallback(() => {
-    setIsVisible(prev => !prev);
-  }, []);
-
-  // Export debug data
-  const exportDebugData = useCallback(() => {
-    const data = {
-      timestamp: new Date().toISOString(),
-      ...debugInfo
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `debug-data-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [debugInfo]);
-
+  // Keyboard shortcut to toggle debug panel
   useEffect(() => {
-    // Initial setup
-    updateEnvironmentInfo();
-    checkConnectionStatus().then(status => {
-      setDebugInfo(prev => ({ ...prev, connectionStatus: status }));
-    });
-
-    // Network status listener
-    const handleOnlineStatus = () => {
-      setDebugInfo(prev => ({
-        ...prev,
-        connectionStatus: {
-          ...prev.connectionStatus,
-          online: navigator.onLine
-        }
-      }));
-    };
-
-    window.addEventListener('online', handleOnlineStatus);
-    window.addEventListener('offline', handleOnlineStatus);
-
-    // Simplified realtime monitoring
-    let realtimeChannel: any = null;
-    
-    try {
-      realtimeChannel = supabase.channel('debug-monitoring');
-      
-      realtimeChannel.on('system', {}, (payload: any) => {
-        const isConnected = payload.status === 'ok';
-        setDebugInfo(prev => ({
-          ...prev,
-          connectionStatus: {
-            ...prev.connectionStatus,
-            realtimeConnected: isConnected
-          }
-        }));
-        
-        logRealtimeEvent('system', 'debug', payload.status, payload);
-      });
-
-      realtimeChannel.subscribe((status: string) => {
-        const isConnected = status === 'SUBSCRIBED';
-        setDebugInfo(prev => ({
-          ...prev,
-          connectionStatus: {
-            ...prev.connectionStatus,
-            realtimeConnected: isConnected
-          }
-        }));
-        
-        logRealtimeEvent('subscription', 'debug', status, null);
-      });
-    } catch (error) {
-      console.warn('Realtime monitoring not available:', error);
-    }
-
-    // Keyboard shortcut for debug panel (Ctrl/Cmd + Shift + D)
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'D') {
+      if (event.ctrlKey && event.shiftKey && event.key === 'D') {
         event.preventDefault();
         toggleDebugPanel();
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleDebugPanel]);
 
-    // Periodic connection check
-    const connectionCheckInterval = setInterval(() => {
-      performPingTest();
-    }, 60000); // Every 60 seconds (reduced frequency)
-
-    return () => {
-      window.removeEventListener('online', handleOnlineStatus);
-      window.removeEventListener('offline', handleOnlineStatus);
-      document.removeEventListener('keydown', handleKeyDown);
-      clearInterval(connectionCheckInterval);
-      
-      if (realtimeChannel) {
-        try {
-          realtimeChannel.unsubscribe();
-        } catch (error) {
-          console.warn('Error unsubscribing from realtime:', error);
-        }
-      }
-    };
-  }, [updateEnvironmentInfo, checkConnectionStatus, logRealtimeEvent, toggleDebugPanel, performPingTest]);
-
-  // Simplified fetch interceptor
-  useEffect(() => {
-    const originalFetch = window.fetch;
-    window.fetch = async (...args) => {
-      const startTime = Date.now();
-      const url = typeof args[0] === 'string' ? args[0] : args[0].url;
-      const method = typeof args[1] === 'object' && args[1]?.method ? args[1].method : 'GET';
-      
-      try {
-        const response = await originalFetch(...args);
-        const duration = Date.now() - startTime;
-        
-        if (url.includes('supabase')) {
-          logApiRequest(method, url, response.status, duration);
-        }
-        
-        return response;
-      } catch (error: any) {
-        const duration = Date.now() - startTime;
-        
-        if (url.includes('supabase')) {
-          logApiRequest(method, url, 0, duration, error.message);
-        }
-        
-        throw error;
-      }
-    };
-
-    return () => {
-      window.fetch = originalFetch;
-    };
-  }, [logApiRequest]);
+  // Export debug data
+  const exportDebugData = useCallback(() => {
+    const data = JSON.stringify(debugInfo, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `debug-data-${new Date().toISOString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [debugInfo]);
 
   return {
     debugInfo,
     isVisible,
     toggleDebugPanel,
-    performPingTest,
-    clearLogs,
+    clearLogs, // FIX: Renamed
     exportDebugData,
     logApiRequest,
-    logRealtimeEvent
+    logRealtimeEvent,
+    // checkConnectionStatus, // No need to expose this directly to components
   };
 };

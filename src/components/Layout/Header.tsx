@@ -1,9 +1,11 @@
-import React, { memo, useState } from 'react';
+import { memo, useState, useRef, useEffect } from 'react'; // Removed React as it's not directly used
 import { Bell, Search, LogOut, User, X, Menu } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useInventory } from '../../hooks/useInventory';
 import { useAINotifications } from '../../hooks/useAINotifications';
 import { format } from 'date-fns';
+import { useLocation } from 'react-router-dom'; // Import useLocation to get current path
+import type { LowStockAlert, AINotification } from '../../types'; // Import necessary types
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -15,13 +17,18 @@ const Header = memo(({ onMenuClick, sidebarOpen }: HeaderProps) => {
   const { alerts } = useInventory();
   const { notifications } = useAINotifications();
   const [showNotifications, setShowNotifications] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null); // Ref for notifications dropdown
 
-  const activeAlerts = alerts.filter(alert => alert.status === 'active');
-  const criticalAlerts = activeAlerts.filter(alert => alert.alert_level === 'critical' || alert.alert_level === 'out_of_stock');
+  const location = useLocation(); // Get current location for page title
+
+  // FIX: Explicitly type 'alert' parameter and use 'alertLevel'
+  const activeAlerts = alerts.filter((alert: LowStockAlert) => alert.status === 'active');
+  // FIX: Explicitly type 'alert' parameter and use 'alertLevel'
+  const criticalAlerts = activeAlerts.filter((alert: LowStockAlert) => alert.alertLevel === 'critical' || alert.alertLevel === 'out_of_stock');
   
   // Combine AI notifications and alerts
   const allNotifications = [
-    ...notifications.map(n => ({
+    ...notifications.map((n: AINotification) => ({ // FIX: Explicitly type 'n'
       id: n.id,
       type: 'ai' as const,
       title: n.title,
@@ -29,13 +36,14 @@ const Header = memo(({ onMenuClick, sidebarOpen }: HeaderProps) => {
       timestamp: n.timestamp,
       priority: n.priority
     })),
-    ...activeAlerts.map(alert => ({
+    ...activeAlerts.map((alert: LowStockAlert) => ({ // FIX: Explicitly type 'alert'
       id: alert.id,
       type: 'alert' as const,
-      title: `${alert.alert_level.replace('_', ' ')} Stock Alert`,
-      message: `${alert.item?.name} is ${alert.alert_level === 'out_of_stock' ? 'out of stock' : 'running low'}`,
-      timestamp: alert.created_at,
-      priority: alert.alert_level === 'critical' || alert.alert_level === 'out_of_stock' ? 'high' : 'medium'
+      // FIX: Use alertLevel and createdAt
+      title: `${(alert.alertLevel || '').replace('_', ' ')} Stock Alert`, 
+      message: `${alert.item?.name} is ${alert.alertLevel === 'out_of_stock' ? 'out of stock' : 'running low'}`,
+      timestamp: alert.createdAt, // FIX: Use createdAt
+      priority: alert.alertLevel === 'critical' || alert.alertLevel === 'out_of_stock' ? 'high' : 'medium' // FIX: Use alertLevel
     }))
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -45,6 +53,43 @@ const Header = memo(({ onMenuClick, sidebarOpen }: HeaderProps) => {
       case 'medium': return 'border-l-orange-500 bg-orange-50';
       default: return 'border-l-blue-500 bg-blue-50';
     }
+  };
+
+  // Logic to close notifications when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+
+    if (showNotifications) {
+      document.addEventListener('mousedown', handleClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showNotifications]);
+
+  // Derive page title from current URL path
+  const getPageTitle = () => {
+    const path = location.pathname;
+    const segments = path.split('/').filter(s => s); // Filter out empty strings
+    
+    if (segments.length === 0) {
+      return 'Dashboard'; // Default for root path
+    }
+
+    // Format each segment (e.g., "low-stock" -> "Low Stock")
+    const formattedSegments = segments.map(segment => {
+      const replaced = segment.replace(/-/g, ' '); // Replace all hyphens
+      return replaced.charAt(0).toUpperCase() + replaced.slice(1);
+    });
+
+    return formattedSegments.join(' ');
   };
 
   return (
@@ -65,9 +110,11 @@ const Header = memo(({ onMenuClick, sidebarOpen }: HeaderProps) => {
           </button>
         </div>
 
-        {/* Logo for mobile */}
-        <div className="lg:hidden flex items-center">
-          <h1 className="text-lg font-bold text-gray-900">MedInventory</h1>
+        {/* Dynamic Page Title (instead of static Logo for mobile) */}
+        <div className="flex items-center">
+          <h1 className="text-lg font-bold text-gray-900 capitalize">
+            {getPageTitle()}
+          </h1>
         </div>
 
         {/* Search - Hidden on mobile, shown on larger screens */}
@@ -90,7 +137,7 @@ const Header = memo(({ onMenuClick, sidebarOpen }: HeaderProps) => {
           </button>
 
           {/* Notifications */}
-          <div className="relative">
+          <div className="relative" ref={notificationsRef}> {/* Attach ref here */}
             <button 
               onClick={() => setShowNotifications(!showNotifications)}
               className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -173,7 +220,7 @@ const Header = memo(({ onMenuClick, sidebarOpen }: HeaderProps) => {
             </div>
             <div className="hidden sm:block">
               <p className="text-sm font-medium text-gray-900 truncate max-w-32">
-                {profile?.full_name}
+                {profile?.fullName} {/* FIX: Changed full_name to fullName */}
               </p>
               <p className="text-xs text-gray-500 capitalize">
                 {profile?.role?.replace('_', ' ')}
@@ -201,14 +248,6 @@ const Header = memo(({ onMenuClick, sidebarOpen }: HeaderProps) => {
           />
         </div>
       </div>
-
-      {/* Click outside to close notifications */}
-      {showNotifications && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setShowNotifications(false)}
-        />
-      )}
     </header>
   );
 });

@@ -14,13 +14,13 @@ import {
 } from 'lucide-react';
 import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../hooks/useAuth';
-import { format, isAfter, parseISO } from 'date-fns';
+import { format, isAfter, parseISO, isValid } from 'date-fns'; // Import isValid for robust date checking
 import TransactionModal from './TransactionModal';
 import TransactionDetailsModal from './TransactionDetailsModal';
-import type { Transaction } from '../../types';
+import type { Transaction, InventoryItem, UserProfile, LowStockAlert } from '../../types'; // Import necessary types
 
 const TransactionsPage = memo(() => {
-  const { transactions, items, isTransactionsLoading, createTransaction } = useInventory();
+  const { transactions, items, isTransactionsLoading } = useInventory(); // Removed createTransaction as it's not used here directly
   const { canManageInventory, profile } = useAuth();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -31,41 +31,53 @@ const TransactionsPage = memo(() => {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
+  // Helper to safely create a Date object
+  const createSafeDate = (dateString: string | Date | null | undefined): Date | null => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return isValid(date) ? date : null;
+  };
+
   // Filter transactions based on user role
   const userTransactions = useMemo(() => {
     if (canManageInventory) {
       return transactions; // Admin/Staff see all transactions
     }
     // Regular users only see their own transactions
-    return transactions.filter(t => t.user_id === profile?.user_id);
-  }, [transactions, canManageInventory, profile?.user_id]);
+    // FIX: Changed t.user_id to t.userId and profile?.user_id to profile?.userId
+    return transactions.filter((t: Transaction) => t.userId === profile?.userId); 
+  }, [transactions, canManageInventory, profile?.userId]);
 
   // Filter transactions based on search and filters
   const filteredTransactions = useMemo(() => {
-    return userTransactions.filter(transaction => {
+    return userTransactions.filter((transaction: Transaction) => { // FIX: Explicitly type 'transaction'
       const matchesSearch = transaction.item?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           transaction.user?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           transaction.user?.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) || // FIX: Changed full_name to fullName
                            transaction.notes?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesType = !selectedType || transaction.transaction_type === selectedType;
+      const matchesType = !selectedType || transaction.transactionType === selectedType; // FIX: Changed transaction_type to transactionType
       const matchesStatus = !selectedStatus || transaction.status === selectedStatus;
       
       let matchesDate = true;
       if (dateRange) {
-        const transactionDate = new Date(transaction.created_at);
+        const transactionDate = createSafeDate(transaction.createdAt); // FIX: Changed created_at to createdAt
         const today = new Date();
-        switch (dateRange) {
-          case 'today':
-            matchesDate = transactionDate.toDateString() === today.toDateString();
-            break;
-          case 'week':
-            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-            matchesDate = transactionDate >= weekAgo;
-            break;
-          case 'month':
-            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
-            matchesDate = transactionDate >= monthAgo;
-            break;
+        if (transactionDate) { // Ensure transactionDate is valid
+          switch (dateRange) {
+            case 'today':
+              matchesDate = format(transactionDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'); // Compare formatted dates
+              break;
+            case 'week':
+              const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+              matchesDate = transactionDate >= weekAgo;
+              break;
+            case 'month':
+              const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+              matchesDate = transactionDate >= monthAgo;
+              break;
+          }
+        } else {
+          matchesDate = false; // If date is invalid, it doesn't match any range
         }
       }
       
@@ -75,9 +87,9 @@ const TransactionsPage = memo(() => {
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const activeCheckouts = userTransactions.filter(t => t.status === 'active' && t.transaction_type === 'checkout').length;
-    const overdueItems = userTransactions.filter(t => t.status === 'overdue').length;
-    const completedReturns = userTransactions.filter(t => t.status === 'completed').length;
+    const activeCheckouts = userTransactions.filter((t: Transaction) => t.status === 'active' && t.transactionType === 'checkout').length; // FIX: Explicitly type 't', changed transaction_type to transactionType
+    const overdueItems = userTransactions.filter((t: Transaction) => t.status === 'overdue').length; // FIX: Explicitly type 't'
+    const completedReturns = userTransactions.filter((t: Transaction) => t.status === 'completed').length; // FIX: Explicitly type 't'
     const totalTransactions = userTransactions.length;
 
     return {
@@ -99,14 +111,14 @@ const TransactionsPage = memo(() => {
 
   const exportToCSV = () => {
     const headers = ['Date', 'Item', 'User', 'Type', 'Quantity', 'Status', 'Due Date', 'Notes'];
-    const csvData = filteredTransactions.map(transaction => [
-      format(new Date(transaction.created_at), 'yyyy-MM-dd HH:mm'),
+    const csvData = filteredTransactions.map((transaction: Transaction) => [ // FIX: Explicitly type 'transaction'
+      format(createSafeDate(transaction.createdAt) || new Date(), 'yyyy-MM-dd HH:mm'), // FIX: Changed created_at to createdAt
       transaction.item?.name || '',
-      transaction.user?.full_name || '',
-      transaction.transaction_type,
+      transaction.user?.fullName || '', // FIX: Changed full_name to fullName
+      transaction.transactionType, // FIX: Changed transaction_type to transactionType
       transaction.quantity,
       transaction.status,
-      transaction.due_date ? format(new Date(transaction.due_date), 'yyyy-MM-dd') : '',
+      transaction.dueDate ? format(createSafeDate(transaction.dueDate) || new Date(), 'yyyy-MM-dd') : '', // FIX: Changed due_date to dueDate
       transaction.notes || ''
     ]);
 
@@ -145,10 +157,11 @@ const TransactionsPage = memo(() => {
     }
   };
 
-  const isOverdue = (transaction: Transaction) => {
-    return transaction.due_date && 
+  const isOverdue = (transaction: Transaction) => { // FIX: Explicitly type 'transaction'
+    const dueDate = createSafeDate(transaction.dueDate); // FIX: Changed due_date to dueDate
+    return dueDate && 
            transaction.status === 'active' && 
-           isAfter(new Date(), parseISO(transaction.due_date));
+           isAfter(new Date(), dueDate);
   };
 
   if (isTransactionsLoading) {
@@ -320,67 +333,69 @@ const TransactionsPage = memo(() => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredTransactions.map((transaction) => (
-                <tr key={transaction.id} className={`hover:bg-gray-50 ${isOverdue(transaction) ? 'bg-red-50' : ''}`}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {transaction.item?.name || 'Unknown Item'}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        by {transaction.user?.full_name || 'Unknown User'}
-                      </div>
-                      {transaction.location_used && (
-                        <div className="text-xs text-gray-400">
-                          Used at: {transaction.location_used}
+              {filteredTransactions.length > 0 ? ( // FIX: Added conditional rendering for table rows
+                filteredTransactions.map((transaction: Transaction) => (
+                  <tr key={transaction.id} className={`hover:bg-gray-50 ${isOverdue(transaction) ? 'bg-red-50' : ''}`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {transaction.item?.name || 'Unknown Item'}
                         </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(transaction.transaction_type)}`}>
-                      {transaction.transaction_type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {transaction.quantity}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(transaction.status)}`}>
-                        {transaction.status}
+                        <div className="text-sm text-gray-500">
+                          by {transaction.user?.fullName || 'Unknown User'} {/* FIX: Changed full_name to fullName */}
+                        </div>
+                        {transaction.locationUsed && ( // FIX: Changed location_used to locationUsed
+                          <div className="text-xs text-gray-400">
+                            Used at: {transaction.locationUsed} {/* FIX: Changed location_used to locationUsed */}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(transaction.transactionType)}`}> {/* FIX: Changed transaction_type to transactionType */}
+                        {transaction.transactionType} {/* FIX: Changed transaction_type to transactionType */}
                       </span>
-                      {isOverdue(transaction) && (
-                        <AlertTriangle className="w-4 h-4 text-red-500" title="Overdue" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div>
-                      <div>Created: {format(new Date(transaction.created_at), 'MMM dd, yyyy')}</div>
-                      {transaction.due_date && (
-                        <div className={isOverdue(transaction) ? 'text-red-600' : 'text-gray-500'}>
-                          Due: {format(new Date(transaction.due_date), 'MMM dd, yyyy')}
-                        </div>
-                      )}
-                      {transaction.returned_date && (
-                        <div className="text-green-600">
-                          Returned: {format(new Date(transaction.returned_date), 'MMM dd, yyyy')}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleViewDetails(transaction)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.quantity}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(transaction.status)}`}>
+                          {transaction.status}
+                        </span>
+                        {isOverdue(transaction) && (
+                          <AlertTriangle className="w-4 h-4 text-red-500" title="Overdue" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div>
+                        <div>Created: {format(createSafeDate(transaction.createdAt) || new Date(), 'MMM dd, HH:mm')}</div> {/* FIX: Changed created_at to createdAt */}
+                        {transaction.dueDate && ( // FIX: Changed due_date to dueDate
+                          <div className={isOverdue(transaction) ? 'text-red-600' : 'text-gray-500'}>
+                            Due: {format(createSafeDate(transaction.dueDate) || new Date(), 'MMM dd, HH:mm')} {/* FIX: Changed due_date to dueDate */}
+                          </div>
+                        )}
+                        {transaction.returnedDate && ( // FIX: Changed returned_date to returnedDate
+                          <div className="text-green-600">
+                            Returned: {format(createSafeDate(transaction.returnedDate) || new Date(), 'MMM dd, HH:mm')} {/* FIX: Changed returned_date to returnedDate */}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <button
+                        onClick={() => handleViewDetails(transaction)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : null} {/* If no filtered transactions, render nothing here */}
             </tbody>
           </table>
         </div>

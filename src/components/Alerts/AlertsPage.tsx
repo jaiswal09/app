@@ -1,20 +1,18 @@
-import React, { useState, memo, useMemo } from 'react';
+import { useState, memo, useMemo } from 'react'; // Removed React as it's not directly used
 import { 
   AlertTriangle, 
   CheckCircle, 
-  Clock, 
   Package,
   Search,
-  Filter,
-  Eye,
   Bell,
-  BellOff
-} from 'lucide-react';
+  BellOff,
+  Eye
+} from 'lucide-react'; // Removed unused icons: Clock, Filter
 import { useInventory } from '../../hooks/useInventory';
 import { useAuth } from '../../hooks/useAuth';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns'; // Import isValid for robust date checking
 import AlertDetailsModal from './AlertDetailsModal';
-import type { LowStockAlert } from '../../types';
+import type { LowStockAlert } from '../../types'; // Import necessary type
 
 const AlertsPage = memo(() => {
   const { alerts, acknowledgeAlert, isAlertsLoading } = useInventory();
@@ -26,11 +24,18 @@ const AlertsPage = memo(() => {
   const [selectedAlert, setSelectedAlert] = useState<LowStockAlert | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
+  // Helper function to safely create and check a Date object
+  const createSafeDate = (dateString: string | Date | undefined | null): Date | null => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    return isValid(date) ? date : null;
+  };
+
   // Filter alerts
   const filteredAlerts = useMemo(() => {
-    return alerts.filter(alert => {
+    return alerts.filter((alert: LowStockAlert) => { // FIX: Explicitly type 'alert'
       const matchesSearch = alert.item?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesLevel = !selectedLevel || alert.alert_level === selectedLevel;
+      const matchesLevel = !selectedLevel || alert.alertLevel === selectedLevel; // FIX: Changed alert_level to alertLevel
       const matchesStatus = !selectedStatus || alert.status === selectedStatus;
       
       return matchesSearch && matchesLevel && matchesStatus;
@@ -39,21 +44,22 @@ const AlertsPage = memo(() => {
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const active = alerts.filter(a => a.status === 'active').length;
-    const critical = alerts.filter(a => a.alert_level === 'critical' && a.status === 'active').length;
-    const outOfStock = alerts.filter(a => a.alert_level === 'out_of_stock' && a.status === 'active').length;
-    const acknowledged = alerts.filter(a => a.status === 'acknowledged').length;
+    const active = alerts.filter((a: LowStockAlert) => a.status === 'active').length; // FIX: Explicitly type 'a'
+    const critical = alerts.filter((a: LowStockAlert) => a.alertLevel === 'critical' && a.status === 'active').length; // FIX: Explicitly type 'a', changed alert_level to alertLevel
+    const outOfStock = alerts.filter((a: LowStockAlert) => a.alertLevel === 'out_of_stock' && a.status === 'active').length; // FIX: Explicitly type 'a', changed alert_level to alertLevel
+    const acknowledged = alerts.filter((a: LowStockAlert) => a.status === 'acknowledged').length; // FIX: Explicitly type 'a'
 
     return { active, critical, outOfStock, acknowledged };
   }, [alerts]);
 
-  const handleAcknowledgeAlert = (alert: LowStockAlert) => {
+  const handleAcknowledgeAlert = (alert: LowStockAlert) => { // FIX: Explicitly type 'alert'
     if (profile) {
-      acknowledgeAlert({ alertId: alert.id, userId: profile.user_id });
+      // FIX: Changed user_id to userId
+      acknowledgeAlert({ alertId: alert.id, userId: profile.userId }); 
     }
   };
 
-  const handleViewDetails = (alert: LowStockAlert) => {
+  const handleViewDetails = (alert: LowStockAlert) => { // FIX: Explicitly type 'alert'
     setSelectedAlert(alert);
     setIsDetailsModalOpen(true);
   };
@@ -223,74 +229,76 @@ const AlertsPage = memo(() => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAlerts.map((alert) => {
-                const AlertIcon = getAlertIcon(alert.alert_level);
-                
-                return (
-                  <tr key={alert.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-3">
-                        <AlertIcon className={`w-5 h-5 ${
-                          alert.alert_level === 'critical' || alert.alert_level === 'out_of_stock' 
-                            ? 'text-red-500' 
-                            : 'text-orange-500'
-                        }`} />
+              {filteredAlerts.length > 0 ? ( // FIX: Added conditional rendering for table rows
+                filteredAlerts.map((alert: LowStockAlert) => { // FIX: Explicitly type 'alert'
+                  const AlertIcon = getAlertIcon(alert.alertLevel); // FIX: Changed alert_level to alertLevel
+                  
+                  return (
+                    <tr key={alert.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-3">
+                          <AlertIcon className={`w-5 h-5 ${
+                            alert.alertLevel === 'critical' || alert.alertLevel === 'out_of_stock' // FIX: Changed alert_level to alertLevel
+                              ? 'text-red-500' 
+                              : 'text-orange-500'
+                          }`} />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {alert.item?.name || 'Unknown Item'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {alert.item?.description}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getAlertLevelColor(alert.alertLevel)}`}> {/* FIX: Changed alert_level to alertLevel */}
+                          {alert.alertLevel.replace('_', ' ')} {/* FIX: Changed alert_level to alertLevel */}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {alert.item?.name || 'Unknown Item'}
+                          <div className="font-medium">
+                            Current: {alert.currentQuantity} {/* FIX: Changed current_quantity to currentQuantity */}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {alert.item?.description}
+                          <div className="text-gray-500">
+                            Minimum: {alert.minQuantity} {/* FIX: Changed min_quantity to minQuantity */}
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getAlertLevelColor(alert.alert_level)}`}>
-                        {alert.alert_level.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div>
-                        <div className="font-medium">
-                          Current: {alert.current_quantity}
-                        </div>
-                        <div className="text-gray-500">
-                          Minimum: {alert.min_quantity}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(alert.status)}`}>
-                        {alert.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {format(new Date(alert.created_at), 'MMM dd, yyyy HH:mm')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleViewDetails(alert)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {canManageInventory && alert.status === 'active' && (
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(alert.status)}`}>
+                          {alert.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {format(createSafeDate(alert.createdAt) || new Date(), 'MMM dd, HH:mm')} {/* FIX: Changed created_at to createdAt */}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => handleAcknowledgeAlert(alert)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Acknowledge Alert"
+                            onClick={() => handleViewDetails(alert)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View Details"
                           >
-                            <CheckCircle className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                          {canManageInventory && alert.status === 'active' && (
+                            <button
+                              onClick={() => handleAcknowledgeAlert(alert)}
+                              className="text-green-600 hover:text-green-900"
+                              title="Acknowledge Alert"
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : null} {/* If no filtered alerts, render nothing here */}
             </tbody>
           </table>
         </div>

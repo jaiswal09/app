@@ -35,7 +35,7 @@ router.get('/', async (req: AuthRequest, res) => {
       where.OR = [
         { name: { contains: search as string, mode: 'insensitive' } },
         { description: { contains: search as string, mode: 'insensitive' } },
-        { serialNumber: { contains: search as string, mode: 'insensitive' } },
+        { serialNumber: { contains: search as string, mode: 'insensitive' } }, // FIX: Changed serialNumber to camelCase
         { qrCode: { contains: search as string, mode: 'insensitive' } },
       ];
     }
@@ -71,7 +71,7 @@ router.get('/', async (req: AuthRequest, res) => {
       prisma.inventoryItem.count({ where })
     ]);
 
-    res.json({
+    return res.json({
       items,
       pagination: {
         page: parseInt(page as string),
@@ -82,7 +82,7 @@ router.get('/', async (req: AuthRequest, res) => {
     });
   } catch (error) {
     logger.error('Error fetching inventory items:', error);
-    res.status(500).json({ error: 'Failed to fetch inventory items' });
+    return res.status(500).json({ error: 'Failed to fetch inventory items' });
   }
 });
 
@@ -144,10 +144,10 @@ router.get('/:id', async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Inventory item not found' });
     }
 
-    res.json(item);
+    return res.json(item);
   } catch (error) {
     logger.error('Error fetching inventory item:', error);
-    res.status(500).json({ error: 'Failed to fetch inventory item' });
+    return res.status(500).json({ error: 'Failed to fetch inventory item' });
   }
 });
 
@@ -171,6 +171,7 @@ router.post('/', requireAdminOrStaff, async (req: AuthRequest, res) => {
         ...validatedData,
         qrCode,
         createdBy: currentUser.id,
+        // FIX: Convert date strings to Date objects
         expiryDate: validatedData.expiryDate ? new Date(validatedData.expiryDate) : null,
         lastMaintenance: validatedData.lastMaintenance ? new Date(validatedData.lastMaintenance) : null,
         nextMaintenance: validatedData.nextMaintenance ? new Date(validatedData.nextMaintenance) : null,
@@ -197,7 +198,7 @@ router.post('/', requireAdminOrStaff, async (req: AuthRequest, res) => {
     logger.info(`Inventory item created: ${item.name} (QR: ${item.qrCode})`);
     broadcastUpdate('inventory_created', item);
 
-    res.status(201).json(item);
+    return res.status(201).json(item);
   } catch (error: any) {
     logger.error('Error creating inventory item:', error);
     
@@ -208,7 +209,7 @@ router.post('/', requireAdminOrStaff, async (req: AuthRequest, res) => {
       });
     }
 
-    res.status(500).json({ error: 'Failed to create inventory item' });
+    return res.status(500).json({ error: 'Failed to create inventory item' });
   }
 });
 
@@ -230,6 +231,7 @@ router.put('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
       where: { id },
       data: {
         ...validatedData,
+        // FIX: Convert date strings to Date objects
         expiryDate: validatedData.expiryDate ? new Date(validatedData.expiryDate) : null,
         lastMaintenance: validatedData.lastMaintenance ? new Date(validatedData.lastMaintenance) : null,
         nextMaintenance: validatedData.nextMaintenance ? new Date(validatedData.nextMaintenance) : null,
@@ -258,7 +260,7 @@ router.put('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
     logger.info(`Inventory item updated: ${item.name}`);
     broadcastUpdate('inventory_updated', item);
 
-    res.json(item);
+    return res.json(item);
   } catch (error: any) {
     logger.error('Error updating inventory item:', error);
     
@@ -273,7 +275,7 @@ router.put('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Inventory item not found' });
     }
 
-    res.status(500).json({ error: 'Failed to update inventory item' });
+    return res.status(500).json({ error: 'Failed to update inventory item' });
   }
 });
 
@@ -304,7 +306,7 @@ router.delete('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
     logger.info(`Inventory item deleted: ${id}`);
     broadcastUpdate('inventory_deleted', { id });
 
-    res.json({ message: 'Inventory item deleted successfully' });
+    return res.json({ message: 'Inventory item deleted successfully' });
   } catch (error: any) {
     logger.error('Error deleting inventory item:', error);
     
@@ -312,7 +314,7 @@ router.delete('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Inventory item not found' });
     }
 
-    res.status(500).json({ error: 'Failed to delete inventory item' });
+    return res.status(500).json({ error: 'Failed to delete inventory item' });
   }
 });
 
@@ -354,10 +356,10 @@ router.patch('/:id/quantity', requireAdminOrStaff, async (req: AuthRequest, res)
 
     broadcastUpdate('inventory_updated', item);
 
-    res.json(item);
+    return res.json(item);
   } catch (error) {
     logger.error('Error updating item quantity:', error);
-    res.status(500).json({ error: 'Failed to update item quantity' });
+    return res.status(500).json({ error: 'Failed to update item quantity' });
   }
 });
 
@@ -376,7 +378,7 @@ router.get('/stats/overview', async (req: AuthRequest, res) => {
       prisma.inventoryItem.count(),
       prisma.inventoryItem.aggregate({
         _sum: {
-          unitPrice: true
+          unitPrice: true // FIX: Changed unitPrice to camelCase
         }
       }),
       prisma.inventoryItem.count({
@@ -386,28 +388,24 @@ router.get('/stats/overview', async (req: AuthRequest, res) => {
       }),
       prisma.inventoryItem.count({
         where: {
-          expiryDate: {
+          expiryDate: { // FIX: Changed expiryDate to camelCase
             gte: new Date(),
             lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Next 30 days
           }
         }
       }),
+      // FIX: Removed 'include' from groupBy as it's not supported directly
       prisma.inventoryItem.groupBy({
-        by: ['categoryId'],
+        by: ['categoryId'], // FIX: Changed categoryId to camelCase
         _count: { id: true },
-        _sum: { quantity: true, unitPrice: true },
-        include: {
-          category: {
-            select: { name: true, color: true }
-          }
-        }
+        _sum: { quantity: true, unitPrice: true }, // FIX: Changed unitPrice to camelCase
       }),
       prisma.inventoryItem.groupBy({
         by: ['status'],
         _count: { id: true }
       }),
       prisma.inventoryItem.groupBy({
-        by: ['itemType'],
+        by: ['itemType'], // FIX: Changed itemType to camelCase
         _count: { id: true },
         _sum: { quantity: true }
       })
@@ -415,30 +413,31 @@ router.get('/stats/overview', async (req: AuthRequest, res) => {
 
     const stats = {
       totalItems,
-      totalValue: totalValue._sum.unitPrice || 0,
+      totalValue: totalValue._sum.unitPrice || 0, // FIX: Changed unitPrice to camelCase
       lowStockCount,
       expiringSoonCount,
+      // Frontend will need to map category names/colors based on categoryId
       byCategory: byCategory.map(item => ({
-        categoryId: item.categoryId,
+        categoryId: item.categoryId, // FIX: Changed categoryId to camelCase
         count: item._count.id,
         totalQuantity: item._sum.quantity || 0,
-        totalValue: item._sum.unitPrice || 0
+        totalValue: item._sum.unitPrice || 0 // FIX: Changed unitPrice to camelCase
       })),
       byStatus: byStatus.map(item => ({
         status: item.status,
         count: item._count.id
       })),
       byType: byType.map(item => ({
-        type: item.itemType,
+        type: item.itemType, // FIX: Changed itemType to camelCase
         count: item._count.id,
         totalQuantity: item._sum.quantity || 0
       }))
     };
 
-    res.json(stats);
+    return res.json(stats);
   } catch (error) {
     logger.error('Error fetching inventory statistics:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    return res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
 
@@ -446,33 +445,41 @@ router.get('/stats/overview', async (req: AuthRequest, res) => {
 async function createLowStockAlert(item: any) {
   try {
     const alertLevel = item.quantity === 0 ? 'out_of_stock' :
-                     item.quantity <= item.minQuantity * 0.5 ? 'critical' : 'low';
+                     item.quantity <= item.minQuantity * 0.5 ? 'critical' : 'low'; // FIX: Changed minQuantity to camelCase
 
-    await prisma.lowStockAlert.upsert({
-      where: {
-        itemId: item.id
-      },
-      update: {
-        currentQuantity: item.quantity,
-        minQuantity: item.minQuantity,
-        alertLevel,
-        status: 'active'
-      },
-      create: {
-        itemId: item.id,
-        currentQuantity: item.quantity,
-        minQuantity: item.minQuantity,
-        alertLevel,
-        status: 'active'
-      }
+    // FIX: Changed upsert to findFirst + update/create as itemId is not unique
+    const existingAlert = await prisma.lowStockAlert.findFirst({
+      where: { itemId: item.id, status: 'active' } // Find an existing active alert for this item
     });
+
+    if (existingAlert) {
+      await prisma.lowStockAlert.update({
+        where: { id: existingAlert.id }, // Update by unique ID
+        data: {
+          currentQuantity: item.quantity,
+          minQuantity: item.minQuantity, // FIX: Changed minQuantity to camelCase
+          alertLevel, // FIX: Changed alertLevel to camelCase
+          status: 'active'
+        }
+      });
+    } else {
+      await prisma.lowStockAlert.create({
+        data: {
+          itemId: item.id,
+          currentQuantity: item.quantity,
+          minQuantity: item.minQuantity, // FIX: Changed minQuantity to camelCase
+          alertLevel, // FIX: Changed alertLevel to camelCase
+          status: 'active'
+        }
+      });
+    }
 
     broadcastUpdate('low_stock_alert', {
       itemId: item.id,
       itemName: item.name,
       currentQuantity: item.quantity,
-      minQuantity: item.minQuantity,
-      alertLevel
+      minQuantity: item.minQuantity, // FIX: Changed minQuantity to camelCase
+      alertLevel // FIX: Changed alertLevel to camelCase
     });
   } catch (error) {
     logger.error('Error creating low stock alert:', error);

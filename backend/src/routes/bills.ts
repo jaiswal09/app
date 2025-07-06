@@ -1,5 +1,5 @@
 import express from 'express';
-import { prisma, broadcastUpdate } from '../server';
+import { prisma, broadcastUpdate } from '../server'; // No 'db' import needed
 import { logger } from '../utils/logger';
 import { billSchema, billPaymentSchema } from '../utils/validators';
 import { requireAdminOrStaff, AuthRequest } from '../middleware/auth';
@@ -124,6 +124,32 @@ router.post('/', requireAdminOrStaff, async (req: AuthRequest, res) => {
     const billNumber = `BILL-${String(billCount + 1).padStart(6, '0')}`;
 
     const bill = await prisma.$transaction(async (tx) => {
+      // Step 1: Validate and deduct inventory quantities within the same Prisma transaction
+      for (const item of validatedData.items) {
+        const inventoryItem = await tx.inventoryItem.findUnique({
+          where: { id: item.itemId },
+          select: { quantity: true, name: true } // Select name for error message
+        });
+
+        if (!inventoryItem) {
+          throw new Error(`Inventory item not found: ${item.itemId}`);
+        }
+
+        const currentQuantity = inventoryItem.quantity;
+        const requestedQuantity = item.quantity;
+
+        if (currentQuantity < requestedQuantity) {
+          throw new Error(`Insufficient stock for item ${inventoryItem.name}. Available: ${currentQuantity}, Requested: ${requestedQuantity}`);
+        }
+
+        // Deduct quantity
+        await tx.inventoryItem.update({
+          where: { id: item.itemId },
+          data: { quantity: currentQuantity - requestedQuantity }
+        });
+      }
+
+      // Step 2: Create the bill in Prisma
       const newBill = await tx.bill.create({
         data: {
           billNumber,
@@ -139,16 +165,18 @@ router.post('/', requireAdminOrStaff, async (req: AuthRequest, res) => {
           discountAmount: validatedData.discountAmount,
           totalAmount: validatedData.totalAmount,
           notes: validatedData.notes,
-          createdBy: currentUser.id
+          createdBy: currentUser.id,
+          paymentStatus: 'pending' // Default for new bills
         }
       });
 
-      // Create bill items
+      // Step 3: Create bill items in Prisma
       const billItems = await Promise.all(
         validatedData.items.map(item =>
           tx.billItem.create({
             data: {
               billId: newBill.id,
+              itemId: item.itemId, // Store itemId for inventory restoration
               itemName: item.itemName,
               itemDescription: item.itemDescription,
               quantity: item.quantity,
@@ -176,6 +204,11 @@ router.post('/', requireAdminOrStaff, async (req: AuthRequest, res) => {
       });
     }
 
+    // Catch specific errors from inventory transaction
+    if (error.message.includes('Insufficient stock') || error.message.includes('Inventory item not found')) {
+      return res.status(400).json({ error: error.message });
+    }
+
     res.status(500).json({ error: 'Failed to create bill' });
   }
 });
@@ -187,7 +220,53 @@ router.put('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
     const validatedData = billSchema.parse(req.body);
 
     const bill = await prisma.$transaction(async (tx) => {
-      // Update bill
+      // Step 1: Get old bill items to restore inventory
+      const oldBillItems = await tx.billItem.findMany({
+        where: { billId: id }
+      });
+
+      // Step 2: Restore old quantities in inventory
+      for (const oldItem of oldBillItems) {
+        // Only restore if itemId exists (i.e., it was an inventory item)
+        if (oldItem.itemId) {
+          await tx.inventoryItem.update({
+            where: { id: oldItem.itemId },
+            data: { quantity: { increment: oldItem.quantity } } // Use increment for atomic update
+          });
+        }
+      }
+
+      // Step 3: Delete existing bill items
+      await tx.billItem.deleteMany({
+        where: { billId: id }
+      });
+
+      // Step 4: Validate and deduct new inventory quantities
+      for (const newItem of validatedData.items) {
+        const inventoryItem = await tx.inventoryItem.findUnique({
+          where: { id: newItem.itemId },
+          select: { quantity: true, name: true } // Select name for error message
+        });
+
+        if (!inventoryItem) {
+          throw new Error(`Inventory item not found: ${newItem.itemId}`);
+        }
+
+        const currentQuantity = inventoryItem.quantity;
+        const requestedQuantity = newItem.quantity;
+
+        if (currentQuantity < requestedQuantity) {
+          throw new Error(`Insufficient stock for item ${inventoryItem.name}. Available: ${currentQuantity}, Requested: ${requestedQuantity}`);
+        }
+
+        // Deduct quantity
+        await tx.inventoryItem.update({
+          where: { id: newItem.itemId },
+          data: { quantity: { decrement: requestedQuantity } } // Use decrement for atomic update
+        });
+      }
+
+      // Step 5: Update bill
       const updatedBill = await tx.bill.update({
         where: { id },
         data: {
@@ -202,21 +281,18 @@ router.put('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
           taxAmount: validatedData.taxAmount,
           discountAmount: validatedData.discountAmount,
           totalAmount: validatedData.totalAmount,
-          notes: validatedData.notes
+          notes: validatedData.notes,
+          status: validatedData.status // Ensure status is updated
         }
       });
 
-      // Delete existing items
-      await tx.billItem.deleteMany({
-        where: { billId: id }
-      });
-
-      // Create new items
+      // Step 6: Create new bill items
       const billItems = await Promise.all(
         validatedData.items.map(item =>
           tx.billItem.create({
             data: {
               billId: id,
+              itemId: item.itemId, // Store itemId for inventory restoration
               itemName: item.itemName,
               itemDescription: item.itemDescription,
               quantity: item.quantity,
@@ -248,11 +324,16 @@ router.put('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Bill not found' });
     }
 
+    // Catch specific errors from inventory transaction
+    if (error.message.includes('Insufficient stock') || error.message.includes('Inventory item not found')) {
+      return res.status(400).json({ error: error.message });
+    }
+
     res.status(500).json({ error: 'Failed to update bill' });
   }
 });
 
-// Update bill status
+// Update bill status (no inventory change here, as it's just status)
 router.patch('/:id/status', requireAdminOrStaff, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -355,9 +436,29 @@ router.delete('/:id', requireAdminOrStaff, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
-    await prisma.bill.delete({
-      where: { id }
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Get bill items to restore inventory
+      const billItemsToRestore = await tx.billItem.findMany({
+        where: { billId: id }
+      });
+
+      // Step 2: Restore inventory quantities
+      for (const item of billItemsToRestore) {
+        // Only restore if itemId exists (i.e., it was an inventory item)
+        if (item.itemId) {
+          await tx.inventoryItem.update({
+            where: { id: item.itemId },
+            data: { quantity: { increment: item.quantity } } // Use increment for atomic update
+          });
+        }
+      }
+
+      // Step 3: Delete the bill (Prisma will handle cascade delete for bill_items and bill_payments if configured)
+      await tx.bill.delete({
+        where: { id }
+      });
     });
+
 
     logger.info(`Bill deleted: ${id}`);
     broadcastUpdate('bill_deleted', { id });

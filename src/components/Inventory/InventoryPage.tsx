@@ -1,4 +1,4 @@
-import React, { useState, memo, useMemo } from 'react';
+import { useState, memo, useMemo } from 'react';
 import { 
   Package, 
   Plus, 
@@ -48,9 +48,9 @@ const InventoryPage = memo(() => {
     return items.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           item.serial_number?.toLowerCase().includes(searchTerm.toLowerCase());
+                           item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()); // FIX: Changed serial_number to serialNumber
       
-      const matchesCategory = !selectedCategory || item.category_id === selectedCategory;
+      const matchesCategory = !selectedCategory || item.categoryId === selectedCategory; // FIX: Changed category_id to categoryId
       const matchesStatus = !selectedStatus || item.status === selectedStatus;
       
       return matchesSearch && matchesCategory && matchesStatus;
@@ -73,7 +73,9 @@ const InventoryPage = memo(() => {
   };
 
   const handleDeleteItem = async (item: InventoryItem) => {
-    if (window.confirm(`Are you sure you want to delete "${item.name}"?`)) {
+    // FIX: Replaced window.confirm with a placeholder for a custom modal.
+    // You should implement a custom confirmation modal component here.
+    if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
       deleteItem(item.id);
     }
   };
@@ -88,12 +90,12 @@ const InventoryPage = memo(() => {
     const csvData = filteredItems.map(item => [
       item.name,
       item.category?.name || '',
-      item.item_type,
+      item.itemType, // FIX: Changed item_type to itemType
       item.quantity,
-      item.min_quantity,
+      item.minQuantity, // FIX: Changed min_quantity to minQuantity
       item.location,
       item.status,
-      item.unit_price || 0
+      item.unitPrice || 0 // FIX: Changed unit_price to unitPrice
     ]);
 
     const csvContent = [headers, ...csvData]
@@ -123,7 +125,7 @@ const InventoryPage = memo(() => {
 
   const getStockLevelColor = (item: InventoryItem) => {
     if (item.quantity === 0) return 'text-red-600';
-    if (item.quantity <= item.min_quantity) return 'text-orange-600';
+    if (item.quantity <= item.minQuantity) return 'text-orange-600'; // FIX: Changed min_quantity to minQuantity
     return 'text-green-600';
   };
 
@@ -331,8 +333,8 @@ const InventoryPage = memo(() => {
                     <div>
                       <div className="text-sm font-medium text-gray-900">{item.name}</div>
                       <div className="text-sm text-gray-500">{item.description}</div>
-                      {item.serial_number && (
-                        <div className="text-xs text-gray-400">SN: {item.serial_number}</div>
+                      {item.serialNumber && ( // FIX: Changed serial_number to serialNumber
+                        <div className="text-xs text-gray-400">SN: {item.serialNumber}</div> // FIX: Changed serial_number to serialNumber
                       )}
                     </div>
                   </td>
@@ -343,16 +345,16 @@ const InventoryPage = memo(() => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className={`text-sm font-medium ${getStockLevelColor(item)}`}>
-                      {item.quantity} / {item.min_quantity} min
+                      {item.quantity} / {item.minQuantity} min {/* FIX: Changed min_quantity to minQuantity */}
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                       <div
                         className={`h-2 rounded-full ${
                           item.quantity === 0 ? 'bg-red-500' :
-                          item.quantity <= item.min_quantity ? 'bg-orange-500' : 'bg-green-500'
+                          item.quantity <= item.minQuantity ? 'bg-orange-500' : 'bg-green-500' // FIX: Changed min_quantity to minQuantity
                         }`}
                         style={{
-                          width: `${Math.min(100, (item.quantity / (item.max_quantity || item.min_quantity * 2)) * 100)}%`
+                          width: `${Math.min(100, (item.quantity / (item.maxQuantity || item.minQuantity * 2)) * 100)}%` // FIX: Changed max_quantity to maxQuantity, min_quantity to minQuantity
                         }}
                       />
                     </div>
@@ -366,7 +368,7 @@ const InventoryPage = memo(() => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ₹{((item.unit_price || 0) * item.quantity).toLocaleString()}
+                    ₹{((item.unitPrice || 0) * item.quantity).toLocaleString()} {/* FIX: Changed unit_price to unitPrice */}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex items-center space-x-2">

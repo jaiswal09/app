@@ -1,8 +1,7 @@
-import React, { useState, memo } from 'react';
+import { useState, memo } from 'react'; // Removed React as it's not directly used
 import { X, Save, Loader2, Search } from 'lucide-react';
 import { useTransactions } from '../../hooks/useTransactions';
-import { useInventory } from '../../hooks/useInventory';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuth'; // useInventory is not directly used for data here, only for type
 import { addDays, format } from 'date-fns';
 import type { InventoryItem } from '../../types';
 
@@ -18,10 +17,10 @@ const TransactionModal = memo(({ items, onClose }: TransactionModalProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [formData, setFormData] = useState({
-    transaction_type: 'checkout' as const,
+    transactionType: 'checkout' as const, // FIX: Changed transaction_type to transactionType
     quantity: 1,
-    due_date: format(addDays(new Date(), 7), 'yyyy-MM-dd'), // Default to 7 days from now
-    location_used: '',
+    dueDate: format(addDays(new Date(), 7), 'yyyy-MM-dd'), // FIX: Changed due_date to dueDate
+    locationUsed: '', // FIX: Changed location_used to locationUsed
     notes: ''
   });
 
@@ -38,12 +37,12 @@ const TransactionModal = memo(({ items, onClose }: TransactionModalProps) => {
     if (!selectedItem || !profile) return;
 
     const transactionData = {
-      item_id: selectedItem.id,
-      user_id: profile.user_id,
-      transaction_type: formData.transaction_type,
+      itemId: selectedItem.id, // FIX: Changed item_id to itemId
+      userId: profile.userId, // FIX: Changed user_id to userId
+      transactionType: formData.transactionType, // FIX: Changed transaction_type to transactionType
       quantity: Number(formData.quantity),
-      due_date: formData.transaction_type === 'checkout' ? formData.due_date : null,
-      location_used: formData.location_used || null,
+      dueDate: formData.transactionType === 'checkout' ? formData.dueDate : null, // FIX: Changed due_date to dueDate
+      locationUsed: formData.locationUsed || null, // FIX: Changed location_used to locationUsed
       notes: formData.notes || null,
       status: 'active' as const
     };
@@ -81,8 +80,8 @@ const TransactionModal = memo(({ items, onClose }: TransactionModalProps) => {
             </label>
             <select
               required
-              value={formData.transaction_type}
-              onChange={(e) => handleInputChange('transaction_type', e.target.value)}
+              value={formData.transactionType} // FIX: Changed transaction_type to transactionType
+              onChange={(e) => handleInputChange('transactionType', e.target.value)} // FIX: Changed transaction_type to transactionType
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="checkout">Check Out</option>
@@ -128,7 +127,7 @@ const TransactionModal = memo(({ items, onClose }: TransactionModalProps) => {
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-medium text-gray-900">
-                        ${item.unit_price || 0}
+                        ₹{item.unitPrice || 0} {/* FIX: Changed unit_price to unitPrice */}
                       </div>
                       <div className="text-xs text-gray-500">
                         {item.category?.name}
@@ -178,15 +177,15 @@ const TransactionModal = memo(({ items, onClose }: TransactionModalProps) => {
           </div>
 
           {/* Due Date (only for checkout) */}
-          {formData.transaction_type === 'checkout' && (
+          {formData.transactionType === 'checkout' && ( // FIX: Changed transaction_type to transactionType
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Due Date
               </label>
               <input
                 type="date"
-                value={formData.due_date}
-                onChange={(e) => handleInputChange('due_date', e.target.value)}
+                value={formData.dueDate} // FIX: Changed due_date to dueDate
+                onChange={(e) => handleInputChange('dueDate', e.target.value)} // FIX: Changed due_date to dueDate
                 min={format(new Date(), 'yyyy-MM-dd')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -200,8 +199,8 @@ const TransactionModal = memo(({ items, onClose }: TransactionModalProps) => {
             </label>
             <input
               type="text"
-              value={formData.location_used}
-              onChange={(e) => handleInputChange('location_used', e.target.value)}
+              value={formData.locationUsed} // FIX: Changed location_used to locationUsed
+              onChange={(e) => handleInputChange('locationUsed', e.target.value)} // FIX: Changed location_used to locationUsed
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="e.g., Operating Room 1, Patient Room 205"
             />

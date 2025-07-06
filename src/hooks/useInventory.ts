@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useMemo } from 'react'; // Removed useState, useCallback as they are not directly used
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   inventoryApi, 
@@ -14,10 +14,9 @@ import { toast } from 'react-hot-toast';
 export const useInventory = () => {
   const queryClient = useQueryClient();
 
-export const useInventory = () => {
-  const queryClient = useQueryClient();
-
   // Queries with better error handling and fallbacks
+
+  // Categories Query
   const categoriesQuery = useQuery({
     queryKey: ['categories'],
     queryFn: async () => {
@@ -32,6 +31,7 @@ export const useInventory = () => {
     retryDelay: 1000,
   });
 
+  // Inventory Query
   const inventoryQuery = useQuery({
     queryKey: ['inventory'],
     queryFn: async () => {
@@ -46,7 +46,7 @@ export const useInventory = () => {
     retryDelay: 1000,
   });
 
-  // Simplified transactions query
+  // Transactions Query
   const transactionsQuery = useQuery({
     queryKey: ['transactions'],
     queryFn: async () => {
@@ -61,7 +61,7 @@ export const useInventory = () => {
     retryDelay: 1000,
   });
 
-  // Simplified maintenance query
+  // Maintenance Query
   const maintenanceQuery = useQuery({
     queryKey: ['maintenance'],
     queryFn: async () => {
@@ -76,6 +76,7 @@ export const useInventory = () => {
     retryDelay: 1000,
   });
 
+  // Low Stock Alerts Query
   const lowStockAlertsQuery = useQuery({
     queryKey: ['low-stock-alerts'],
     queryFn: async () => {
@@ -92,6 +93,7 @@ export const useInventory = () => {
 
   // Real-time subscriptions with WebSocket
   useEffect(() => {
+    // Subscribe to WebSocket messages and invalidate relevant queries
     const unsubscribe = websocketApi.subscribe((message) => {
       const { type, data } = message;
       
@@ -129,21 +131,30 @@ export const useInventory = () => {
           break;
           
         default:
+          // Log unknown message types for debugging
+          console.warn('Unknown WebSocket message type:', type, data);
           break;
       }
     });
 
-    // Ensure WebSocket is connected
+    // Ensure WebSocket is connected when the component mounts
     if (!websocketApi.isConnected()) {
       websocketApi.connect();
     }
 
-    return unsubscribe;
-  }, [queryClient]);
+    // Cleanup function: unsubscribe from WebSocket when the component unmounts
+    return () => {
+      unsubscribe();
+      // Optionally, disconnect WebSocket if no other parts of the app use it
+      // websocketApi.disconnect(); 
+    };
+  }, [queryClient]); // Dependency array: re-run effect if queryClient changes (unlikely)
 
   // Mutations with better error handling
+
+  // Inventory Item Mutations
   const createItemMutation = useMutation({
-    mutationFn: async (item: Omit<InventoryItem, 'id' | 'created_at' | 'updated_at' | 'qr_code'>) => {
+    mutationFn: async (item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt' | 'qrCode'>) => { // FIX: Changed snake_case properties to camelCase
       const response = await inventoryApi.create(item);
       if (response.error) {
         throw new Error(response.error);
@@ -193,9 +204,9 @@ export const useInventory = () => {
     }
   });
 
-  // Category mutations
+  // Category Mutations
   const createCategoryMutation = useMutation({
-    mutationFn: async (categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (categoryData: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => { // FIX: Changed snake_case properties to camelCase
       const response = await categoriesApi.create(categoryData);
       if (response.error) {
         throw new Error(response.error);
@@ -245,8 +256,9 @@ export const useInventory = () => {
     }
   });
 
+  // Transaction Mutation
   const createTransactionMutation = useMutation({
-    mutationFn: async (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>) => {
+    mutationFn: async (transaction: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>) => { // FIX: Changed snake_case properties to camelCase
       const response = await transactionsApi.create(transaction);
       if (response.error) {
         throw new Error(response.error);
@@ -255,7 +267,7 @@ export const useInventory = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] }); // Invalidate inventory as transactions affect stock
       toast.success('Transaction created successfully!');
     },
     onError: (error: any) => {
@@ -263,6 +275,7 @@ export const useInventory = () => {
     }
   });
 
+  // Alert Acknowledgment Mutation
   const acknowledgeAlertMutation = useMutation({
     mutationFn: async (alertId: string) => {
       const response = await alertsApi.acknowledge(alertId);
@@ -280,55 +293,69 @@ export const useInventory = () => {
     }
   });
 
-  // Computed values with safe defaults
+  // Computed values with safe defaults using useMemo for performance
   const stats = useMemo(() => {
-    const items = inventoryQuery.data || [];
-    const transactions = transactionsQuery.data || [];
-    const alerts = lowStockAlertsQuery.data || [];
+    const items: InventoryItem[] = inventoryQuery.data || [];
+    const transactions: Transaction[] = transactionsQuery.data || [];
+    const alerts: LowStockAlert[] = lowStockAlertsQuery.data || [];
 
     const totalItems = items.length;
-    const lowStockItems = alerts.filter(alert => alert.status === 'active').length;
-    const activeTransactions = transactions.filter(t => t.status === 'active').length;
-    const overdueItems = transactions.filter(t => t.status === 'overdue').length;
-    const totalValue = items.reduce((sum, item) => sum + (item.unit_price || 0) * item.quantity, 0);
+    // Filter active alerts for low stock items count
+    const lowStockItemsCount = alerts.filter((alert: LowStockAlert) => alert.status === 'active').length;
+    // Filter active transactions
+    const activeTransactionsCount = transactions.filter((t: Transaction) => t.status === 'active').length;
+    // Filter overdue transactions
+    const overdueItemsCount = transactions.filter((t: Transaction) => t.status === 'overdue').length;
+    // Calculate total value of inventory
+    const totalValue = items.reduce((sum: number, item: InventoryItem) => sum + (item.unitPrice || 0) * item.quantity, 0); // FIX: Changed unit_price to unitPrice
 
     return {
       totalItems,
-      lowStockItems,
-      activeTransactions,
-      overdueItems,
+      lowStockItems: lowStockItemsCount, // Renamed to avoid conflict with lowStockItems computed value
+      activeTransactions: activeTransactionsCount,
+      overdueItems: overdueItemsCount,
       totalValue
     };
   }, [inventoryQuery.data, transactionsQuery.data, lowStockAlertsQuery.data]);
 
+  // Filter for items below their minimum quantity
   const lowStockItems = useMemo(() => {
-    const items = inventoryQuery.data || [];
-    return items.filter(item => item.quantity <= item.min_quantity);
+    const items: InventoryItem[] = inventoryQuery.data || [];
+    return items.filter((item: InventoryItem) => item.quantity <= (item.minQuantity || 0)); // FIX: Changed min_quantity to minQuantity
   }, [inventoryQuery.data]);
 
+  // Filter for items below 50% of their minimum quantity
   const criticalItems = useMemo(() => {
-    const items = inventoryQuery.data || [];
-    return items.filter(item => item.quantity <= item.min_quantity * 0.5);
+    const items: InventoryItem[] = inventoryQuery.data || [];
+    return items.filter((item: InventoryItem) => item.quantity <= (item.minQuantity || 0) * 0.5); // FIX: Changed min_quantity to minQuantity
   }, [inventoryQuery.data]);
 
+  // Return all data, loading states, error states, mutations, and computed values
   return {
-    // Data with safe defaults
+    // Data with safe defaults (empty arrays if data is not yet loaded or is undefined)
     categories: categoriesQuery.data || [],
     items: inventoryQuery.data || [],
     transactions: transactionsQuery.data || [],
     maintenance: maintenanceQuery.data || [],
     alerts: lowStockAlertsQuery.data || [],
     
-    // Loading states
-    isLoading: inventoryQuery.isLoading || categoriesQuery.isLoading,
+    // Loading states for queries
+    isLoading: inventoryQuery.isLoading || categoriesQuery.isLoading || transactionsQuery.isLoading || maintenanceQuery.isLoading || lowStockAlertsQuery.isLoading,
+    isCategoriesLoading: categoriesQuery.isLoading,
+    isInventoryLoading: inventoryQuery.isLoading,
     isTransactionsLoading: transactionsQuery.isLoading,
     isMaintenanceLoading: maintenanceQuery.isLoading,
     isAlertsLoading: lowStockAlertsQuery.isLoading,
     
-    // Error states
-    error: inventoryQuery.error || categoriesQuery.error,
+    // Error states for queries
+    error: inventoryQuery.error || categoriesQuery.error || transactionsQuery.error || maintenanceQuery.error || lowStockAlertsQuery.error,
+    categoriesError: categoriesQuery.error,
+    inventoryError: inventoryQuery.error,
+    transactionsError: transactionsQuery.error,
+    maintenanceError: maintenanceQuery.error,
+    alertsError: lowStockAlertsQuery.error,
     
-    // Item mutations
+    // Item mutations (functions to trigger actions)
     createItem: createItemMutation.mutate,
     updateItem: updateItemMutation.mutate,
     deleteItem: deleteItemMutation.mutate,
@@ -342,12 +369,12 @@ export const useInventory = () => {
     createTransaction: createTransactionMutation.mutate,
     acknowledgeAlert: acknowledgeAlertMutation.mutate,
     
-    // Computed data
+    // Computed data (derived from fetched data)
     stats,
     lowStockItems,
     criticalItems,
     
-    // Loading states for mutations
+    // Loading states for mutations (to show pending status in UI)
     isCreatingItem: createItemMutation.isPending,
     isUpdatingItem: updateItemMutation.isPending,
     isDeletingItem: deleteItemMutation.isPending,
@@ -355,5 +382,6 @@ export const useInventory = () => {
     isCreatingCategory: createCategoryMutation.isPending,
     isUpdatingCategory: updateCategoryMutation.isPending,
     isDeletingCategory: deleteCategoryMutation.isPending,
+    isAcknowledgingAlert: acknowledgeAlertMutation.isPending,
   };
 };

@@ -14,27 +14,31 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useDebug } from '../../hooks/useDebug';
+import { NavLink, useLocation } from 'react-router-dom'; // Import NavLink and useLocation
 
 interface SidebarProps {
-  activeSection: string;
-  onSectionChange: (section: string) => void;
+  // activeSection: string; // REMOVED: No longer needed with React Router NavLink
+  onSectionChange: () => void; // Modified: Now just used to close sidebar on mobile
 }
 
 const navigation = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff', 'medical_personnel'] },
-  { id: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'staff', 'medical_personnel'] },
-  { id: 'transactions', label: 'Transactions', icon: ArrowRightLeft, roles: ['admin', 'staff', 'medical_personnel'] },
-  { id: 'billing', label: 'Billing', icon: Receipt, roles: ['admin', 'staff'] },
-  { id: 'maintenance', label: 'Maintenance', icon: Wrench, roles: ['admin', 'staff'] },
-  { id: 'alerts', label: 'Alerts', icon: AlertTriangle, roles: ['admin', 'staff'] },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'staff'] },
-  { id: 'users', label: 'Users', icon: Users, roles: ['admin'] },
-  { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] }
+  // Changed 'id' to 'path' to match React Router paths
+  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'staff', 'medical_personnel'] },
+  { path: '/inventory', label: 'Inventory', icon: Package, roles: ['admin', 'staff', 'medical_personnel'] },
+  { path: '/transactions', label: 'Transactions', icon: ArrowRightLeft, roles: ['admin', 'staff', 'medical_personnel'] },
+  { path: '/billing', label: 'Billing', icon: Receipt, roles: ['admin', 'staff'] },
+  { path: '/maintenance', label: 'Maintenance', icon: Wrench, roles: ['admin', 'staff'] },
+  { path: '/alerts', label: 'Alerts', icon: AlertTriangle, roles: ['admin', 'staff'] },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'staff'] },
+  { path: '/users', label: 'Users', icon: Users, roles: ['admin'] },
+  { path: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] }
 ];
 
-const Sidebar = memo(({ activeSection, onSectionChange }: SidebarProps) => {
+// Removed activeSection from props, onSectionChange is now just for closing sidebar
+const Sidebar = memo(({ onSectionChange }: SidebarProps) => {
   const { profile } = useAuth();
   const { toggleDebugPanel, debugInfo } = useDebug();
+  const location = useLocation(); // Get current location to manually check active if needed (less common with NavLink)
 
   const filteredNavigation = navigation.filter(item => 
     profile?.role && item.roles.includes(profile.role)
@@ -57,7 +61,7 @@ const Sidebar = memo(({ activeSection, onSectionChange }: SidebarProps) => {
           {/* Close button for mobile */}
           <button 
             className="lg:hidden p-1 text-gray-400 hover:text-gray-600"
-            onClick={() => onSectionChange(activeSection)} // This will close the sidebar
+            onClick={onSectionChange} // Call onSectionChange to close sidebar
           >
             <X className="w-5 h-5" />
           </button>
@@ -68,22 +72,24 @@ const Sidebar = memo(({ activeSection, onSectionChange }: SidebarProps) => {
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {filteredNavigation.map((item) => {
           const Icon = item.icon;
-          const isActive = activeSection === item.id;
           
           return (
-            <button
-              key={item.id}
-              onClick={() => onSectionChange(item.id)}
-              className={`w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                  : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
-              }`}
+            <NavLink // FIX: Changed button to NavLink
+              key={item.path} // Use path as key
+              to={item.path} // Link to the path
+              onClick={onSectionChange} // Close sidebar on mobile after navigation
+              className={({ isActive }) => // Use isActive prop from NavLink
+                `w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  isActive // NavLink automatically determines if it's active
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`
+              }
               title={item.label}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
               <span className="truncate">{item.label}</span>
-            </button>
+            </NavLink>
           );
         })}
       </nav>
@@ -96,8 +102,9 @@ const Sidebar = memo(({ activeSection, onSectionChange }: SidebarProps) => {
             <div className={`w-2 h-2 rounded-full ${
               debugInfo.connectionStatus.online ? 'bg-green-500' : 'bg-red-500'
             }`} title="Network" />
+            {/* FIX: Changed supabaseConnected to databaseConnected */}
             <div className={`w-2 h-2 rounded-full ${
-              debugInfo.connectionStatus.supabaseConnected ? 'bg-green-500' : 'bg-red-500'
+              debugInfo.connectionStatus.databaseConnected ? 'bg-green-500' : 'bg-red-500'
             }`} title="Database" />
             <div className={`w-2 h-2 rounded-full ${
               debugInfo.connectionStatus.realtimeConnected ? 'bg-green-500' : 'bg-orange-500'
